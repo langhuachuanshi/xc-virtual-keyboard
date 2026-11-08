@@ -10,13 +10,14 @@
 - **粘滞修饰键**:Shift / Ctrl / Alt / Win 与物理键盘同构 —— 点亮即按下、熄灭即弹起,支持 Ctrl+Shift 等纯修饰键组合(如切换输入法);空点 Shift 由输入法切换中/英,空点 Win 弹开始菜单
 - **Caps 真切换**:同步系统真实大小写锁定状态,物理键盘动过也能自愈对齐
 - **长按连发**:按住 Backspace/方向键/字母等 500ms 后自动连发,松开停止,物理键盘手感
+- **单实例**:已在运行时再次双击静默退出,不弹任何提示(命名互斥体,崩溃自动解锁)
 - **Fn 层**:Fn + F1~F8 = 静音/音量/播放/上下曲/浏览器前后;Fn + 方向键 = Home / End / PgUp / PgDn。点亮 Fn 时按键自动换标签提示,熄灭还原
 - **不抢焦点**:点键盘不会夺走目标窗口焦点;窗口常驻顶层,任务栏有图标
 - 资产全部内嵌,启动不打磁盘,单 exe 即完整程序
 
 ## 下载
 
-[Releases](https://github.com/langhuachuanshi/xcgui-virtual-keyboard/releases) · 当前 [v0.2.2](https://github.com/langhuachuanshi/xcgui-virtual-keyboard/releases/tag/v0.2.2)
+[Releases](https://github.com/langhuachuanshi/xcgui-virtual-keyboard/releases) · 当前 [v0.2.3](https://github.com/langhuachuanshi/xcgui-virtual-keyboard/releases/tag/v0.2.3)
 
 | 文件 | 适用 |
 |---|---|

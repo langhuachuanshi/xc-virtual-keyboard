@@ -11,6 +11,10 @@
 //   - 普通键单个 LButtonDown 干完播音+发键(按下即出,真键盘手感);
 //   - min/close 的 buttonType 只管视觉,动作由代码挂 BnClick。
 //
+// Shift 对齐物理键盘:点亮时数字/标点键帽切上档符号显示;空点熄灭(本轮没
+// 消费过)补发一次 Shift 单击,由目标系统输入法完成中/英切换。Win 空点同理
+// 弹开始菜单。
+//
 // 状态同步(虚拟键盘通行做法,防合成事件卡修饰键/大小写反转):Caps 不盲发,
 // 先在 UI 线程读 GetKeyState 系统真实态,与按钮期望态不一致才补发。注意
 // GetKeyState 是每线程快照,只能在 UI 线程读;本窗口不获焦、收不到键盘消息,
@@ -167,16 +171,36 @@ var fnLayer = []struct {
 	{"btn_right", uint32(xcc.VK_End), "End"},
 }
 
-// fnLabelOrig 记录 Fn 标签换掉前的原文本,熄灭时还原(F 区回 F1..F8,
-// 方向键回空)。
-var fnLabelOrig = map[string]string{}
+// labelSwap 一条临时标签替换:键名 → 替换文本。
+type labelSwap struct {
+	name  string
+	label string
+}
+
+// shiftLayer: Shift 点亮时数字/标点键帽切上档符号显示(字母恒大写不动),
+// 熄灭还原 —— 对应物理键盘键帽的上档层。
+var shiftLayer = []labelSwap{
+	{"btn_grave", "~"},
+	{"btn_1", "!"}, {"btn_2", "@"}, {"btn_3", "#"}, {"btn_4", "$"},
+	{"btn_5", "%"}, {"btn_6", "^"}, {"btn_7", "&"}, {"btn_8", "*"},
+	{"btn_9", "("}, {"btn_0", ")"},
+	{"btn_minus", "_"}, {"btn_equal", "+"},
+	{"btn_bracket_l", "{"}, {"btn_bracket_r", "}"},
+	{"btn_backslash", "|"}, {"btn_semicolon", ":"}, {"btn_quote", `"`},
+	{"btn_comma", "<"}, {"btn_period", ">"}, {"btn_slash", "?"},
+}
+
+// labelOrig 记录标签换掉前的原文本(Fn 与 Shift 共用,两集合键不相交),
+// 还原后清空;空表 = 当前没有换过标签,还原操作幂等。
+var labelOrig = map[string]string{}
 
 // 粘滞态以 Go 变量为真源(由 Button_Check 回调同步,DLL 的勾选视觉自动跟随
-// 用户点击)。winConsumed 标记本轮 Win 粘滞是否已被组合键消费,决定熄灭时
-// 要不要补发 Win 单击。
+// 用户点击)。winConsumed/shiftConsumed 标记本轮 Win/Shift 粘滞是否已被组合
+// 键消费,决定空点熄灭时要不要补发单击(Win=开始菜单,Shift=输入法中英切换)。
 var (
-	stickyOn    = map[string]bool{}
-	winConsumed bool
+	stickyOn      = map[string]bool{}
+	winConsumed   bool
+	shiftConsumed bool
 )
 
 // btnByName 全部按键按钮引用,由 bindKeys 填充:粘滞熄灭、Fn 标签切换、
@@ -226,15 +250,15 @@ func takeSticky() []string {
 }
 
 // unlightButtons 熄灭按钮勾选态(UI 线程执行)。stickyOn 已在 takeSticky 清零,
-// Button_Check 若触发,Win 单击条件(stickyOn 仍为真)不成立,不会误弹开始
-// 菜单;restoreFnLabels 幂等,无 Fn 时是空操作。
+// Button_Check 若触发,空点单击的条件(stickyOn 仍为真)不成立,不会误弹开始
+// 菜单/误切输入法;restoreLabels 幂等,没换过标签时是空操作。
 func unlightButtons(names []string) {
 	for _, n := range names {
 		if b := btnByName[n]; b != nil {
 			b.SetCheck(false)
 		}
 	}
-	restoreFnLabels()
+	restoreLabels()
 }
 
 // onModCheck check 型按钮选中态变化(DLL 已翻好视觉,参数即新态)。
@@ -269,12 +293,29 @@ func onModCheck(name string, checked bool) {
 				winConsumed = false // 新一轮挂起,重新计"有没有按过键"
 			}
 		}
+		if name == "btn_shift_l" {
+			if checked {
+				shiftConsumed = false // 新一轮挂起
+				applyShiftLabels()    // 键帽切上档符号显示
+			} else {
+				// Shift 单击 = 输入法中/英切换:空点熄灭(本轮没消费过)补发一次
+				// Shift 单击,物理键盘同款;由目标系统输入法解释(纯英文系统无感)。
+				if stickyOn[name] && !shiftConsumed {
+					keyJobs <- func() {
+						keyDown(uint32(xcc.VK_Shift), false)
+						time.Sleep(15 * time.Millisecond)
+						keyUp(uint32(xcc.VK_Shift), false)
+					}
+				}
+				restoreLabels()
+			}
+		}
 		// Fn 点亮/熄灭时切换映射键的临时标签,当场提示这个键会发什么
 		if name == "btn_fn" {
 			if checked {
 				applyFnLabels()
 			} else {
-				restoreFnLabels()
+				restoreLabels()
 			}
 		}
 		stickyOn[name] = checked
@@ -309,10 +350,13 @@ func onKeyClick(name string) {
 	for _, m := range stickyMods {
 		if stickyOn[m.name] {
 			stuck = append(stuck, m.vk)
+			switch m.name { // 被组合消费的键,空点熄灭时不再补发单击
+			case "btn_win":
+				winConsumed = true
+			case "btn_shift_l":
+				shiftConsumed = true
+			}
 		}
-	}
-	if len(stuck) > 0 {
-		winConsumed = true // 粘滞被组合消费,熄灭时不再补发 Win 单击
 	}
 	release := takeSticky()
 	keyJobs <- func() {
@@ -345,22 +389,34 @@ func unlightOnUI(names []string) {
 func applyFnLabels() {
 	for _, k := range fnLayer {
 		if b := btnByName[k.name]; b != nil {
-			fnLabelOrig[k.name] = b.GetText()
+			labelOrig[k.name] = b.GetText()
 			b.SetText(k.label)
 			b.Redraw(false)
 		}
 	}
 }
 
-// restoreFnLabels Fn 熄灭:还原映射键的原文本。幂等,未换过时是空操作。
-func restoreFnLabels() {
-	for n, orig := range fnLabelOrig {
+// applyShiftLabels Shift 点亮:数字/标点键帽切上档符号并重绘。
+func applyShiftLabels() {
+	for _, s := range shiftLayer {
+		if b := btnByName[s.name]; b != nil {
+			labelOrig[s.name] = b.GetText()
+			b.SetText(s.label)
+			b.Redraw(false)
+		}
+	}
+}
+
+// restoreLabels 还原全部被换掉的标签(Fn/Shift 共用一张回执表,两集合键不相
+// 交)。幂等:没换过时是空操作。
+func restoreLabels() {
+	for n, orig := range labelOrig {
 		if b := btnByName[n]; b != nil {
 			b.SetText(orig)
 			b.Redraw(false)
 		}
 	}
-	fnLabelOrig = map[string]string{}
+	labelOrig = map[string]string{}
 }
 
 // startCapsSync 后台定时把 Caps 按钮点亮态对齐系统真实大写锁定态,物理键盘

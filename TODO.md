@@ -13,6 +13,7 @@
 
 ## 已完成
 
+- [x] Shift 行为补齐(2026-11-08 完成):点亮时数字/标点键帽切上档符号(熄灭还原);空点熄灭补发 Shift 单击 = 系统输入法中/英切换(物理键盘同款,纯英文系统无感)
 - [x] git init + 首次提交 + tag v0.1.0 + 双架构发布产物(build/keyboard.exe x64、keyboard-x86.exe,均 go1.20.14)(2026-11-08 完成)
 - [x] 代码自审六项全修:注入 worker 化+连打竞态、GetKeyState 收 UI 线程、fnLayer 单表、sendKey 合并、注释清理、waveOut 关闭顺序(2026-11-08 完成)
 - [x] Fn 层(2026-11-08 完成):Fn 粘滞 + F1-F8 = 音量/媒体/浏览器键(VK 本地定义,xcc 未收录)、Fn+方向键 = Home/End/PgUp/PgDn;Fn 点亮时 F 区/方向键动态换标签提示,熄灭还原(设计器无需加图标)

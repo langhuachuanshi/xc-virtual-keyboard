@@ -29,6 +29,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 	"unsafe"
@@ -345,6 +346,9 @@ func onModCheck(name string, checked bool) {
 			g := winGen
 			time.AfterFunc(winStartMenuDelay, func() {
 				appUI.CallUiThreadEx(func(data int) int {
+					if atomic.LoadInt32(&exiting) != 0 {
+						return 0 // 销毁后作废:关机路径没有 releaseHeldMods,stickyOn 仍真,会碰已销毁按钮
+					}
 					if !stickyOn[name] || winGen != g {
 						return 0 // 已被组合消费/手动熄灭/新一轮按住,本次超时作废
 					}
@@ -487,14 +491,30 @@ func releaseHeldMods() {
 }
 
 // unlightOnUI 把粘滞按钮熄灭回投到 UI 线程执行(worker 协程不直接碰 UI)。
+// 投递侧与执行侧都查退出标志:投递侧兜住"长按连发中点关闭"(worker 消费任务
+// 晚于窗口销毁 ~25ms 才到这里),执行侧兜住投递后窗口才销毁的在途窗口。
 //
 // names: takeSticky 收走的待熄灭按钮名.
 func unlightOnUI(names []string) {
+	if atomic.LoadInt32(&exiting) != 0 {
+		return
+	}
 	appUI.CallUiThreadEx(func(data int) int {
+		if atomic.LoadInt32(&exiting) != 0 {
+			return 0
+		}
 		unlightButtons(names)
 		return 0
 	}, 0)
 }
+
+// exiting 退出标志:WM_DESTROY 时置位 —— 该时机严格先于子元素销毁,此后任何
+// 回投 UI 的闭包一律作废,不再触碰已销毁的按钮句柄(关机、长按连发中点关闭、
+// ticker 竞态多投等一切路径的统一防线)。go.mod 钉 1.18,不用 atomic.Bool(1.19+)。
+var exiting int32
+
+// capsSyncStop 停止 Caps 同步循环;由 WM_DESTROY 关闭(见 exiting)。
+var capsSyncStop = make(chan struct{})
 
 // startCapsSync 后台定时把 Caps 按钮点亮态对齐系统真实大写锁定态,物理键盘
 // 切换 Caps 不再失步。capsLockOn 必须在 UI 线程读(见其注释),所以读+比+设
@@ -502,18 +522,28 @@ func unlightOnUI(names []string) {
 // 系统态一致不会发键,无回环。
 func startCapsSync(a *app.App) {
 	go func() {
-		for range time.Tick(300 * time.Millisecond) {
-			a.CallUiThreadEx(func(data int) int {
-				b := btnByName["btn_caps"]
-				if b == nil {
+		t := time.NewTicker(300 * time.Millisecond)
+		defer t.Stop()
+		for {
+			select {
+			case <-t.C:
+				a.CallUiThreadEx(func(data int) int {
+					if atomic.LoadInt32(&exiting) != 0 {
+						return 0 // select 竞态多投的在途闭包,销毁后作废(见 exiting)
+					}
+					b := btnByName["btn_caps"]
+					if b == nil {
+						return 0
+					}
+					if on := capsLockOn(); b.IsCheck() != on {
+						b.SetCheck(on)
+						b.Redraw(false)
+					}
 					return 0
-				}
-				if on := capsLockOn(); b.IsCheck() != on {
-					b.SetCheck(on)
-					b.Redraw(false)
-				}
-				return 0
-			}, 0)
+				}, 0)
+			case <-capsSyncStop:
+				return
+			}
 		}
 	}()
 }
@@ -524,6 +554,13 @@ func startCapsSync(a *app.App) {
 //     不同的信号:声音跟"按下",逻辑跟"勾选态变化",时序由 DLL 定,合一不可靠);
 //   - 其余键位:按下播音+首击并启动长按连发,弹起停止并释放粘滞修饰键。
 func bindKeys(w *window.Window) {
+	// 窗口销毁(WM_DESTROY,元素尚未销毁)即置退出标志并停 Caps 同步循环:
+	// 关闭按钮、关机注销等一切销毁路径的统一出口,此后在途 UI 回投全部作废。
+	w.AddEvent_Destroy(func(hWindow int, pbHandled *bool) int {
+		atomic.StoreInt32(&exiting, 1)
+		close(capsSyncStop)
+		return 0
+	})
 	hwnd := w.GetHWND()
 	var walk func(hObj int)
 	walk = func(hObj int) {

@@ -11,10 +11,13 @@
 //   - 普通键单个 LButtonDown 干完播音+发键(按下即出,真键盘手感);
 //   - min/close 的 buttonType 只管视觉,动作由代码挂 BnClick。
 //
-// 粘滞 = 物理按住:点亮修饰键立即注入"按下"、熄灭注入"弹起"(2026-11-08 定稿,
-// 旧模型"点亮不发键、打字才组合"发不出 Ctrl+Shift 这类纯修饰组合,QQ拼音的
-// Shift 切英文等全部无效)。如此 Shift/Win 的空点单击(按下+弹起)就是一次完整
-// 的物理单击:输入法自己切中/英、系统自己弹开始菜单,无需任何特殊分支。
+// 修饰键语义(2026-11-08 定稿,参考 QtSoftKeyboard 等中文软键盘):
+//   - Shift 独立单击 = 完整物理单击,输入法立即切中/英;Ctrl/Alt/Win 点亮时
+//     退化为组合按住(Ctrl+Shift 等纯修饰组合照常);
+//   - Win 点亮即物理按下;winStartMenuDelay 内无组合键消费则自动弹起 ——
+//     无键间隔的按下+弹起,系统自己弹开始菜单;时限内点 E 则 Win+E 照常;
+//   - Ctrl/Alt 粘滞 = 物理按住,点亮按下、熄灭弹起。
+//   - Fn 只记粘滞态驱动 fnLayer 映射,不改任何 UI 文本(提示图标是设计器资产)。
 //
 // 状态同步(虚拟键盘通行做法,防合成事件卡修饰键/大小写反转):Caps 不盲发,
 // 先在 UI 线程读 GetKeyState 系统真实态,与按钮期望态不一致才补发。注意
@@ -189,35 +192,37 @@ const (
 	vkMediaPlayPause uint32 = 0xB3 // 播放/暂停
 )
 
-// fnLayer: Fn 粘滞时的映射层 —— 键名 → 改发的虚拟键 + Fn 点亮时临时显示的
-// 标签(方向键补导航键缺口,对齐笔记本 Fn+方向惯例)。发送映射与标签提示
-// 单表同源,加 Fn 键只改这里。
+// fnLayer: Fn 粘滞时的映射层(F 区媒体/浏览器键 + 方向键补导航缺口,对齐
+// 笔记本 Fn+方向惯例)。提示图标由设计器资产负责,代码不改动 UI 文本。
 var fnLayer = []struct {
-	name  string
-	vk    uint32
-	label string
+	name string
+	vk   uint32
 }{
-	{"btn_f1", vkVolumeMute, "Mute"},
-	{"btn_f2", vkVolumeDown, "Vol-"},
-	{"btn_f3", vkVolumeUp, "Vol+"},
-	{"btn_f4", vkMediaPlayPause, "Play"},
-	{"btn_f5", vkMediaPrev, "Prev"},
-	{"btn_f6", vkMediaNext, "Next"},
-	{"btn_f7", vkBrowserBack, "Back"},
-	{"btn_f8", vkBrowserForward, "Fwd"},
-	{"btn_up", uint32(xcc.VK_PageUp), "PgUp"},
-	{"btn_down", uint32(xcc.VK_PageDown), "PgDn"},
-	{"btn_left", uint32(xcc.VK_Home), "Home"},
-	{"btn_right", uint32(xcc.VK_End), "End"},
+	{"btn_f1", vkVolumeMute},
+	{"btn_f2", vkVolumeDown},
+	{"btn_f3", vkVolumeUp},
+	{"btn_f4", vkMediaPlayPause},
+	{"btn_f5", vkMediaPrev},
+	{"btn_f6", vkMediaNext},
+	{"btn_f7", vkBrowserBack},
+	{"btn_f8", vkBrowserForward},
+	{"btn_up", uint32(xcc.VK_PageUp)},
+	{"btn_down", uint32(xcc.VK_PageDown)},
+	{"btn_left", uint32(xcc.VK_Home)},
+	{"btn_right", uint32(xcc.VK_End)},
 }
 
-// labelOrig 记录 Fn 标签换掉前的原文本,还原后清空;空表 = 当前没有换过
-// 标签,还原操作幂等。
-var labelOrig = map[string]string{}
-
 // 粘滞态以 Go 变量为真源(由 Button_Check 回调同步,DLL 的勾选视觉自动跟随
-// 用户点击);点亮即物理按下,熄灭即物理弹起。
-var stickyOn = map[string]bool{}
+// 用户点击);点亮即物理按下,熄灭即物理弹起。winGen 是 Win 粘滞代数:每次
+// 点亮自增,超时任务凭代数判断自己还有没有效,防止旧超时错误释放新一轮按住。
+var (
+	stickyOn = map[string]bool{}
+	winGen   int
+)
+
+// winStartMenuDelay Win 点亮后无组合键消费的自动弹起时长;到点弹起时无键间隔,
+// 系统弹开始菜单。时限内点 E 之类的键则照常组合。
+const winStartMenuDelay = time.Second
 
 // btnByName 全部按键按钮引用,由 bindKeys 填充:粘滞熄灭、Fn 标签切换、
 // Caps 同步都要从代码侧操作按钮。
@@ -274,8 +279,8 @@ func takeSticky() []string {
 }
 
 // unlightButtons 熄灭按钮勾选态(UI 线程执行)。stickyOn 已在 takeSticky 清零,
-// Button_Check 若触发,空点单击的条件(stickyOn 仍为真)不成立,不会误弹开始
-// 菜单/误切输入法;restoreLabels 幂等,没换过标签时是空操作。
+// Button_Check 若触发,各分支的物理弹起/单击条件(stickyOn 仍为真)不成立,
+// 不会误弹开始菜单/误切输入法。
 func unlightButtons(names []string) {
 	for _, n := range names {
 		if b := btnByName[n]; b != nil {
@@ -283,7 +288,6 @@ func unlightButtons(names []string) {
 			b.Redraw(false) // 程序化改外观必须重绘(AGENTS.md 铁律;漏掉会"状态灭了视觉还亮着")
 		}
 	}
-	restoreLabels()
 }
 
 // onModCheck check 型按钮选中态变化(DLL 已翻好视觉,参数即新态)。
@@ -329,10 +333,36 @@ func onModCheck(name string, checked bool) {
 			keyJobs <- func() { keyUp(uint32(xcc.VK_Shift), false) }
 			stickyOn[name] = false
 		}
+	case "btn_win":
+		// Win:点亮即物理按下;winStartMenuDelay 内无组合键消费就自动弹起 ——
+		// 无键间隔的按下+弹起,系统自己弹开始菜单,单击即得;时限内点 E 则
+		// Win+E 照常组合(发完的弹起有键间隔,不会再弹菜单)。
+		if checked {
+			keyJobs <- func() { keyDown(uint32(xcc.VK_LWin), false) }
+			stickyOn[name] = true
+			winGen++
+			g := winGen
+			time.AfterFunc(winStartMenuDelay, func() {
+				appUI.CallUiThreadEx(func(data int) int {
+					if !stickyOn[name] || winGen != g {
+						return 0 // 已被组合消费/手动熄灭/新一轮按住,本次超时作废
+					}
+					stickyOn[name] = false
+					if b := btnByName[name]; b != nil {
+						b.SetCheck(false)
+						b.Redraw(false)
+					}
+					keyJobs <- func() { keyUp(uint32(xcc.VK_LWin), false) }
+					return 0
+				}, 0)
+			})
+		} else if stickyOn[name] { // 手动熄灭:物理弹起,无键间隔 → 开始菜单
+			keyJobs <- func() { keyUp(uint32(xcc.VK_LWin), false) }
+			stickyOn[name] = false
+		}
 	default:
-		// 粘滞 = 物理按住(ctrl/alt/win):点亮立即注入按下,熄灭注入弹起。
-		// 空点(两次点击间没按过任何键)对系统就是一个完整的物理单击,
-		// Win 单击弹开始菜单、Ctrl+Shift 纯修饰组合都真实成立。
+		// 粘滞 = 物理按住(ctrl/alt):点亮立即注入按下,熄灭注入弹起。
+		// 空点(两次点击间没按过任何键)对系统就是一个完整的物理单击。
 		if stickyOn[name] && !checked {
 			if v := stickyVKOf(name); v != 0 {
 				keyJobs <- func() { keyUp(v, false) }
@@ -343,14 +373,6 @@ func onModCheck(name string, checked bool) {
 			}
 		}
 		stickyOn[name] = checked
-	}
-	// Fn 点亮/熄灭时切换映射键的临时标签,当场提示这个键会发什么
-	if name == "btn_fn" {
-		if checked {
-			applyFnLabels()
-		} else {
-			restoreLabels()
-		}
 	}
 }
 
@@ -408,29 +430,6 @@ func unlightOnUI(names []string) {
 		unlightButtons(names)
 		return 0
 	}, 0)
-}
-
-// applyFnLabels Fn 点亮:映射键换上功能标签并重绘。
-func applyFnLabels() {
-	for _, k := range fnLayer {
-		if b := btnByName[k.name]; b != nil {
-			labelOrig[k.name] = b.GetText()
-			b.SetText(k.label)
-			b.Redraw(false)
-		}
-	}
-}
-
-// restoreLabels 还原全部被换掉的标签(目前只有 Fn 用)。幂等:没换过时是
-// 空操作。
-func restoreLabels() {
-	for n, orig := range labelOrig {
-		if b := btnByName[n]; b != nil {
-			b.SetText(orig)
-			b.Redraw(false)
-		}
-	}
-	labelOrig = map[string]string{}
 }
 
 // startCapsSync 后台定时把 Caps 按钮点亮态对齐系统真实大写锁定态,物理键盘

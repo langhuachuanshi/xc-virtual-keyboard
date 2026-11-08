@@ -388,7 +388,6 @@ const (
 // keyRepeat 当前连发会话;stop 为 nil = 无会话。release 是会话开始时收走的
 // 粘滞键,结束时统一弹起熄灭。仅 UI 线程读写。
 var keyRepeat struct {
-	name    string
 	stop    chan struct{}
 	release []string
 }
@@ -422,7 +421,6 @@ func startKeyRepeat(name string) {
 		time.Sleep(15 * time.Millisecond)
 		keyUp(vk, extendedVK[vk])
 	}
-	keyRepeat.name = name
 	keyRepeat.stop = make(chan struct{})
 	keyRepeat.release = release
 	stop := keyRepeat.stop
@@ -463,7 +461,6 @@ func stopKeyRepeat() {
 	}
 	keyRepeat.stop = nil
 	keyRepeat.release = nil
-	keyRepeat.name = ""
 }
 
 // releaseKeyUp 弹起一批粘滞修饰键(字符/Fn 组合发完后调用)。

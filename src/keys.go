@@ -11,9 +11,9 @@
 //   - 普通键单个 LButtonDown 干完播音+发键(按下即出,真键盘手感);
 //   - min/close 的 buttonType 只管视觉,动作由代码挂 BnClick。
 //
-// Shift 对齐物理键盘:点亮时数字/标点键帽切上档符号显示;空点熄灭(本轮没
-// 消费过)直控输入法转换模式切中/英(WM_IME_CONTROL,确定性,不赌模拟按键
-// 的时序)。Win 空点同理弹开始菜单。
+// Shift 对齐物理键盘:点亮=按住(组合键用);空点熄灭(本轮没消费过)直控
+// 输入法转换模式切中/英(WM_IME_CONTROL,确定性,不赌模拟按键的时序)。
+// Win 空点同理弹开始菜单。按用户要求不做键帽上档显示。
 //
 // 状态同步(虚拟键盘通行做法,防合成事件卡修饰键/大小写反转):Caps 不盲发,
 // 先在 UI 线程读 GetKeyState 系统真实态,与按钮期望态不一致才补发。注意
@@ -207,27 +207,8 @@ var fnLayer = []struct {
 	{"btn_right", uint32(xcc.VK_End), "End"},
 }
 
-// labelSwap 一条临时标签替换:键名 → 替换文本。
-type labelSwap struct {
-	name  string
-	label string
-}
-
-// shiftLayer: Shift 点亮时数字/标点键帽切上档符号显示(字母恒大写不动),
-// 熄灭还原 —— 对应物理键盘键帽的上档层。
-var shiftLayer = []labelSwap{
-	{"btn_grave", "~"},
-	{"btn_1", "!"}, {"btn_2", "@"}, {"btn_3", "#"}, {"btn_4", "$"},
-	{"btn_5", "%"}, {"btn_6", "^"}, {"btn_7", "&"}, {"btn_8", "*"},
-	{"btn_9", "("}, {"btn_0", ")"},
-	{"btn_minus", "_"}, {"btn_equal", "+"},
-	{"btn_bracket_l", "{"}, {"btn_bracket_r", "}"},
-	{"btn_backslash", "|"}, {"btn_semicolon", ":"}, {"btn_quote", `"`},
-	{"btn_comma", "<"}, {"btn_period", ">"}, {"btn_slash", "?"},
-}
-
-// labelOrig 记录标签换掉前的原文本(Fn 与 Shift 共用,两集合键不相交),
-// 还原后清空;空表 = 当前没有换过标签,还原操作幂等。
+// labelOrig 记录 Fn 标签换掉前的原文本,还原后清空;空表 = 当前没有换过
+// 标签,还原操作幂等。
 var labelOrig = map[string]string{}
 
 // 粘滞态以 Go 变量为真源(由 Button_Check 回调同步,DLL 的勾选视觉自动跟随
@@ -352,14 +333,12 @@ func onModCheck(name string, checked bool) {
 		if name == "btn_shift_l" {
 			if checked {
 				shiftConsumed = false // 新一轮挂起
-				applyShiftLabels()    // 键帽切上档符号显示
 			} else {
 				// Shift 单击 = 输入法中/英切换:空点熄灭(本轮没消费过)直控前台
 				// 输入法转换模式,物理键盘单击 Shift 的等价效果;纯英文系统无 IME,无感。
 				if stickyOn[name] && !shiftConsumed {
 					toggleImeMode()
 				}
-				restoreLabels()
 			}
 		}
 		// Fn 点亮/熄灭时切换映射键的临时标签,当场提示这个键会发什么
@@ -448,19 +427,8 @@ func applyFnLabels() {
 	}
 }
 
-// applyShiftLabels Shift 点亮:数字/标点键帽切上档符号并重绘。
-func applyShiftLabels() {
-	for _, s := range shiftLayer {
-		if b := btnByName[s.name]; b != nil {
-			labelOrig[s.name] = b.GetText()
-			b.SetText(s.label)
-			b.Redraw(false)
-		}
-	}
-}
-
-// restoreLabels 还原全部被换掉的标签(Fn/Shift 共用一张回执表,两集合键不相
-// 交)。幂等:没换过时是空操作。
+// restoreLabels 还原全部被换掉的标签(目前只有 Fn 用)。幂等:没换过时是
+// 空操作。
 func restoreLabels() {
 	for n, orig := range labelOrig {
 		if b := btnByName[n]; b != nil {

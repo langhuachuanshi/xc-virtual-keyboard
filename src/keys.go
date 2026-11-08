@@ -280,6 +280,7 @@ func unlightButtons(names []string) {
 	for _, n := range names {
 		if b := btnByName[n]; b != nil {
 			b.SetCheck(false)
+			b.Redraw(false) // 程序化改外观必须重绘(AGENTS.md 铁律;漏掉会"状态灭了视觉还亮着")
 		}
 	}
 	restoreLabels()
@@ -301,10 +302,37 @@ func onModCheck(name string, checked bool) {
 				keyUp(uint32(xcc.VK_CapsLock), false)
 			}
 		}
+	case "btn_shift_l":
+		// Shift(2026-11-08 定稿,参考 QtSoftKeyboard 等中文软键盘):
+		//   - 独立单击 = 一次完整物理单击(按下→50ms→弹起),输入法立即切中/英。
+		//     TabTip 式"点亮+熄灭两击才算单击"正是用户痛点,这里一击到位;
+		//   - Ctrl/Alt/Win 已点亮时退化为组合修饰键:只注入按下,弹起走熄灭路径
+		//     (Ctrl+Shift 切输入法等纯修饰组合照常)。
+		if checked {
+			if stickyOn["btn_ctrl"] || stickyOn["btn_alt"] || stickyOn["btn_win"] {
+				keyJobs <- func() { keyDown(uint32(xcc.VK_Shift), false) }
+				stickyOn[name] = true
+			} else {
+				keyJobs <- func() {
+					keyDown(uint32(xcc.VK_Shift), false)
+					time.Sleep(50 * time.Millisecond)
+					keyUp(uint32(xcc.VK_Shift), false)
+				}
+				stickyOn[name] = false
+				if b := btnByName[name]; b != nil {
+					// DLL 已点亮,拍回去;再触发的 checked=false 分支因未粘滞而无动作
+					b.SetCheck(false)
+					b.Redraw(false)
+				}
+			}
+		} else if stickyOn[name] { // 组合模式熄灭:注入弹起
+			keyJobs <- func() { keyUp(uint32(xcc.VK_Shift), false) }
+			stickyOn[name] = false
+		}
 	default:
-		// 粘滞 = 物理按住:点亮立即注入按下,熄灭注入弹起。空点(两次点击间没
-		// 按过任何键)对系统就是一个完整的物理单击 —— Shift 单击由输入法自己
-		// 切中/英,Win 单击弹开始菜单,Ctrl+Shift 这类纯修饰组合也真实成立。
+		// 粘滞 = 物理按住(ctrl/alt/win):点亮立即注入按下,熄灭注入弹起。
+		// 空点(两次点击间没按过任何键)对系统就是一个完整的物理单击,
+		// Win 单击弹开始菜单、Ctrl+Shift 纯修饰组合都真实成立。
 		if stickyOn[name] && !checked {
 			if v := stickyVKOf(name); v != 0 {
 				keyJobs <- func() { keyUp(v, false) }
@@ -314,15 +342,15 @@ func onModCheck(name string, checked bool) {
 				keyJobs <- func() { keyDown(v, false) }
 			}
 		}
-		// Fn 点亮/熄灭时切换映射键的临时标签,当场提示这个键会发什么
-		if name == "btn_fn" {
-			if checked {
-				applyFnLabels()
-			} else {
-				restoreLabels()
-			}
-		}
 		stickyOn[name] = checked
+	}
+	// Fn 点亮/熄灭时切换映射键的临时标签,当场提示这个键会发什么
+	if name == "btn_fn" {
+		if checked {
+			applyFnLabels()
+		} else {
+			restoreLabels()
+		}
 	}
 }
 

@@ -59,8 +59,10 @@ func main() {
 	// 看起来像"WebView2 没反应"(2026-11-08 实踩)。
 	w.ShowWindow(xcc.SW_SHOWNA)
 	// 置顶:NOACTIVATE 下点击永远不会把窗口提前(这正是按键能进目标窗口的代价),
-	// 屏幕键盘的惯例是常驻顶层,用户随时够得着。
-	wapi.SetWindowPos(hwnd, wapi.HWND_TOPMOST, 0, 0, 0, 0, wapi.SWP_NOMOVE|wapi.SWP_NOSIZE)
+	// 屏幕键盘的惯例是常驻顶层,用户随时够得着。必须带 SWP_NOACTIVATE —— 不带的话
+	// 置顶这一下会激活窗口抢走前台,启动后点键全发进键盘自己进程(2026-11-08 实踩)。
+	wapi.SetWindowPos(hwnd, wapi.HWND_TOPMOST, 0, 0, 0, 0,
+		wapi.SWP_NOMOVE|wapi.SWP_NOSIZE|wapi.SWP_NOACTIVATE)
 	a.Run()
 	closeKeySound()
 	a.Exit()

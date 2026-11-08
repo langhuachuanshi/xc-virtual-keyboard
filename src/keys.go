@@ -1,8 +1,8 @@
-// 按键输入模拟:键位把虚拟键注入系统输入流(keybd_event,Win2000 起的系统
-// API,Win7 可用)。注入统一经 keyJobs 单工作协程串行执行:序列里的毫秒级
-// 延时(shell 热键对时序敏感,事件贴太近会被丢)不阻塞 UI 线程;channel 保序,
-// 快速连打不插队。目标窗口照常收到键盘消息 —— 前提是本键盘不抢焦点
-// (WS_EX_NOACTIVATE,见 main.go)。
+// 按键输入模拟:键位用 SendInput 把虚拟键注入系统输入流(官方推荐注入路径,
+// Win2000 起可用,WebView2/Chromium 与 IME 对它的兼容性最好)。注入统一经
+// keyJobs 单工作协程串行执行:序列里的毫秒级延时(shell 热键对时序敏感,事件
+// 贴太近会被丢)不阻塞 UI 线程;channel 保序,快速连打不插队。目标窗口照常
+// 收到键盘消息 —— 前提是本键盘不抢焦点(WS_EX_NOACTIVATE,见 main.go)。
 //
 // 事件分型:
 //   - check 型按钮(caps/shift_l/ctrl/fn/win/alt,布局里 buttonType="check")不触发
@@ -12,8 +12,8 @@
 //   - min/close 的 buttonType 只管视觉,动作由代码挂 BnClick。
 //
 // Shift 对齐物理键盘:点亮时数字/标点键帽切上档符号显示;空点熄灭(本轮没
-// 消费过)补发一次 Shift 单击,由目标系统输入法完成中/英切换。Win 空点同理
-// 弹开始菜单。
+// 消费过)直控输入法转换模式切中/英(WM_IME_CONTROL,确定性,不赌模拟按键
+// 的时序)。Win 空点同理弹开始菜单。
 //
 // 状态同步(虚拟键盘通行做法,防合成事件卡修饰键/大小写反转):Caps 不盲发,
 // 先在 UI 线程读 GetKeyState 系统真实态,与按钮期望态不一致才补发。注意
@@ -27,6 +27,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unsafe"
 
 	"github.com/langhuachuanshi/xcgui/xcgui/app"
 	"github.com/langhuachuanshi/xcgui/xcgui/wapi"
@@ -37,15 +38,48 @@ import (
 )
 
 var (
-	procKeybdEvent    = syscall.NewLazyDLL("user32.dll").NewProc("keybd_event")
+	procSendInput     = syscall.NewLazyDLL("user32.dll").NewProc("SendInput")
 	procGetKeyState   = syscall.NewLazyDLL("user32.dll").NewProc("GetKeyState")
 	procMapVirtualKey = syscall.NewLazyDLL("user32.dll").NewProc("MapVirtualKeyW")
+	// imm32:中/英切换走 WM_IME_CONTROL 直控转换模式,不模拟 Shift 按键。
+	procImmGetDefaultIMEWnd = syscall.NewLazyDLL("imm32.dll").NewProc("ImmGetDefaultIMEWnd")
 )
 
 const (
 	keyEventF_ExtendedKey = 0x0001
 	keyEventF_KeyUp       = 0x0002
+
+	wmImeControl         = 0x0283
+	imcGetConversionMode = 0x0001
+	imcSetConversionMode = 0x0002
+	imeCmodeNative       = 0x0001 // 转换模式的中/英位:1=中文 0=英文
 )
+
+// INPUT 联合体的 Go 对位:用最大成员 MOUSEINPUT 占位,保证 cbSize 与 C 布局
+// 一致(x64=40, x86=28),KEYBDINPUT 经指针重解释写进同一块内存;字段顺序与
+// 自然对齐照 MSDN,不可乱。
+const inputKeyboard = 0 // INPUT type: 键盘事件
+
+type keyboardInput struct {
+	wVk       uint16
+	wScan     uint16
+	dwFlags   uint32
+	time      uint32
+	extraInfo uintptr
+}
+
+type mouseInput struct {
+	dx, dy    int32
+	mouseData uint32
+	dwFlags   uint32
+	time      uint32
+	extraInfo uintptr
+}
+
+type input struct {
+	typ uint32
+	u   mouseInput
+}
 
 // keyJobs 注入任务队列:缓冲 32 保证 UI 线程入队不阻塞(极端连打也只是背压),
 // worker 串行消费保证键序。appUI 供任务末尾把 UI 操作(CallUiThreadEx 熄灭
@@ -207,18 +241,38 @@ var (
 // Caps 同步都要从代码侧操作按钮。
 var btnByName = map[string]*widget.Button{}
 
-// sendKey 注入单个键事件(带扫描码);扫描码经 MapVirtualKey 取,只发虚拟码
-// 时部分程序(尤其 shell 热键)不认。
+// sendKey 用 SendInput 注入单个键事件(带扫描码)。只发虚拟码时部分消费者
+// (Chromium/WebView2、shell 热键)不认,扫描码经 MapVirtualKeyW 补齐。
 func sendKey(vk uint32, extended, up bool) {
-	flags := uintptr(0)
-	if up {
-		flags = keyEventF_KeyUp
-	}
+	var in input
+	in.typ = inputKeyboard
+	ki := keyboardInput{wVk: uint16(vk), wScan: uint16(scanOf(vk))}
 	if extended {
-		flags |= keyEventF_ExtendedKey
+		ki.dwFlags |= keyEventF_ExtendedKey
 	}
-	scan, _, _ := procMapVirtualKey.Call(uintptr(vk), 0)
-	procKeybdEvent.Call(uintptr(vk), scan, flags, 0)
+	if up {
+		ki.dwFlags |= keyEventF_KeyUp
+	}
+	*(*keyboardInput)(unsafe.Pointer(&in.u)) = ki
+	procSendInput.Call(1, uintptr(unsafe.Pointer(&in)), unsafe.Sizeof(in))
+}
+
+// scanOf 虚拟键 → 扫描码。
+func scanOf(vk uint32) uintptr {
+	s, _, _ := procMapVirtualKey.Call(uintptr(vk), 0)
+	return s
+}
+
+// toggleImeMode 翻转前台窗口输入法的中/英转换模式(等价物理 Shift 单击的
+// 效果,但不赌模拟按键被 IME 认不认)。无 IME 的纯英文系统上自然无感。
+func toggleImeMode() {
+	fg := wapi.GetForegroundWindow()
+	ime, _, _ := procImmGetDefaultIMEWnd.Call(fg)
+	if ime == 0 {
+		return
+	}
+	mode := wapi.SendMessageW(ime, wmImeControl, imcGetConversionMode, 0)
+	wapi.SendMessageW(ime, wmImeControl, imcSetConversionMode, uintptr(mode)^imeCmodeNative)
 }
 
 // keyDown/keyUp sendKey 的语义包装,保留调用点可读性。
@@ -298,14 +352,10 @@ func onModCheck(name string, checked bool) {
 				shiftConsumed = false // 新一轮挂起
 				applyShiftLabels()    // 键帽切上档符号显示
 			} else {
-				// Shift 单击 = 输入法中/英切换:空点熄灭(本轮没消费过)补发一次
-				// Shift 单击,物理键盘同款;由目标系统输入法解释(纯英文系统无感)。
+				// Shift 单击 = 输入法中/英切换:空点熄灭(本轮没消费过)直控前台
+				// 输入法转换模式,物理键盘单击 Shift 的等价效果;纯英文系统无 IME,无感。
 				if stickyOn[name] && !shiftConsumed {
-					keyJobs <- func() {
-						keyDown(uint32(xcc.VK_Shift), false)
-						time.Sleep(15 * time.Millisecond)
-						keyUp(uint32(xcc.VK_Shift), false)
-					}
+					toggleImeMode()
 				}
 				restoreLabels()
 			}

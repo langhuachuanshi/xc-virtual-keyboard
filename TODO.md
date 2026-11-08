@@ -2,6 +2,7 @@
 
 ## 待办
 
+- [ ] WebView2 焦点输入实测:已切 SendInput,若宿主仍收不到,优先排查宿主是否管理员权限运行(UIPI 静默丢弃注入);仍失败则加 GetGUIThreadInfo 取焦点窗口 + PostMessage WM_KEYDOWN/UP 直发回退
 - [ ] main.xml 移除窗口阴影属性(transparentFlag="shadow" shadowSize shadowAngleSize,设计器里改)——Win7 上 DLL 解析布局仍可能内部走带 BUG 的阴影路径,阴影统一由代码按系统接管
 - [ ] resource.res 清理 stale dir 绝对路径(dir 指向已删除的旧 xcgui\images)
 - [ ] Caps 同步真机验收:GetKeyState 是每线程快照,本窗口不获焦可能读到旧值;若真机失步,升级为 AttachThreadInput 挂前台线程再读

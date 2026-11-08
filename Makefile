@@ -20,13 +20,16 @@ OUT := $(BUILD_DIR)/keyboard.exe
 # lanta-pay 2026-09-28 实踩);-trimpath 去本地路径。
 LDFLAGS := -s -w -H=windowsgui
 
-# 不做 UPX 加壳(2026-11-08 实踩定位):加壳版 SendInput 注入对 Electron/Chromium
-# 宿主(如 ZCode)失效,未加壳版同代码正常 —— A/B 各测一次坐实。体积 6.5MB 可接受。
+# UPX 加壳压发布体积(6.5MB -> ~2.3MB)。曾因"加壳版注入失效"短暂移除,后查明真凶是
+# 注入需要管理员权限(已用 requireAdministrator 盾牌解决),加壳无辜,恢复。本地解压在
+# upx-5.2.0-win64,换机器/换版本只改这里。
+UPX := C:/Users/silas/upx-5.2.0-win64/upx.exe
 
 build:
 	@mkdir -p $(BUILD_DIR)
 	GOTOOLCHAIN=$(GO_WIN7) go build -trimpath -ldflags "$(LDFLAGS)" -o $(OUT) ./src
 	@go version $(OUT) 2>/dev/null | head -1 | sed 's/^/==> built with: /'
+	$(UPX) --best $(OUT)
 	@ls -l $(OUT)
 
 # 32 位版(32 位 Win7 老机器):xcgui 绑定同时内嵌 x64/x86 两个 dll,GOARCH=386 直接可用。
@@ -34,6 +37,7 @@ x86:
 	@mkdir -p $(BUILD_DIR)
 	GOTOOLCHAIN=$(GO_WIN7) GOARCH=386 go build -trimpath -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/keyboard-x86.exe ./src
 	@go version $(BUILD_DIR)/keyboard-x86.exe 2>/dev/null | head -1 | sed 's/^/==> built with: /'
+	$(UPX) --best $(BUILD_DIR)/keyboard-x86.exe
 	@ls -l $(BUILD_DIR)/keyboard-x86.exe
 
 # 日常调试:走本机新 Go(1.26),只在本机 Win10/11 跑,不受 Win7 工具链约束。
@@ -51,8 +55,8 @@ clean:
 # HELP-BEGIN
 # 懒獭 - 屏幕键盘 —— 常用命令
 #
-#   make build   发布构建 -> build/keyboard.exe(x64,Win7 x64 ~ Win11)
-#   make x86     32 位版 -> build/keyboard-x86.exe(32 位 Win7)
+#   make build   发布构建 -> build/keyboard.exe(x64,UPX 加壳,Win7 x64 ~ Win11)
+#   make x86     32 位版 -> build/keyboard-x86.exe(UPX 加壳,32 位 Win7)
 #   make run     日常调试(go run,本机新 Go,仅本机 Win10/11)
 #   make check   go vet(与发布同口径,锁 1.20.14)
 #   make clean   清 build/

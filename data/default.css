@@ -1,0 +1,12 @@
+﻿@resFile{
+	path:"resource.res";
+}
+shapeText{
+	font:@MicrosoftYaHei_14;
+	textColor:@TextPrimary;
+}
+buttonUI{
+	font:@MicrosoftYaHei_14;
+	textColor:@TextPrimary;
+	bkInfoM:"@btn_key";
+}

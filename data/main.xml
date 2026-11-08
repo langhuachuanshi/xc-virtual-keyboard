@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--炫彩界面库-窗口布局文件-->
+<head />
+<windowUI rect="0,0,1028,512" content="炫彩界面库 - 我的窗口名" windowStyle="22" center="true" bkInfoM="{99:1.9.9;98:1(0);5:2(15)20(1)21(5)26(1)25(@FillBlank)9(8,8,8,8);}" transparentFlag="shaped" transparentAlpha="250" enableLayout="true" overlayBorder="true" padding="8,8,8,8" layout.space="8" layout.horizon="false">
+	<layoutEleUI rect="445,120,100,100" layout.width="fill" layout.height="40" expandT="false">
+		<layoutEleUI rect="976,14,100,100" layout.width=":1" layout.height="fill" layout.alignV="center" layout.alignBaseline="center" layout.space="8" expandT="false">
+			<shapePicture rect="48,14,32,32" image="@logo.png" />
+			<shapeText layout.width="auto" rect="176,20,100,20" content="懒獭 - 屏幕键盘" css.enable="false" font="@MicrosoftYaHei_16" textColor="@TextPrimary" layout.height="auto" />
+		</layoutEleUI>
+		<layoutEleUI rect="976,14,100,100" layout.horizon="true" layout.alignBaseline="center" layout.width="auto" layout.height="fill" layout.space="8" layout.alignV="center">
+			<buttonUI name="btn_min" rect="41,9,32,32" buttonType="min" transparent="true" bkInfoM="{99:1.9.9;98:16(0)32(1,0)64(0);3:2(48)3(100,100,100,100)4(@minus.png);5:2(15)20(1)21(5)26(1)25(@FillDark);}" bkInfoM_nameT="0(图片)1(矩形)" css.enable="false" />
+			<buttonUI name="btn_close" rect="-757,50,32,32" buttonType="close" bkInfoM="{99:1.9.9;98:16(0,2)32(1,2)64(0,2);5:2(15)20(1)21(5)26(1)25(@Transparent);5:2(15)20(1)21(5)26(1)25(@Danger);3:2(48)3(32,32,0,0)4(@close.png);}" bkInfoM_nameT="0(矩形)1(矩形)2(图片)" transparent="true" css.enable="false" />
+		</layoutEleUI>
+	</layoutEleUI>
+	<layoutEleUI rect="816,162,100,100" layout.width="fill" layout.height=":1" layout.space="16" layout.horizon="false">
+		<layoutEleUI rect="672,114,100,100" layout.width="fill" layout.height="64" layout.space="16" expandT="false">
+			<layoutEleUI rect="528,30,100,100" layout.height="fill" layout.width="auto">
+				<buttonUI name="btn_esc" rect="96,52,64,64" content="Esc" />
+			</layoutEleUI>
+			<layoutEleUI rect="-29,32,100,100" layout.height="fill" layout.width="auto" layout.space="4">
+				<buttonUI name="btn_f1" rect="96,52,64,64" content="F1" imageIcon="@Mute.png" iconAlign="right" offsetIconXY="-2" offsetXY="4" />
+				<buttonUI name="btn_f2" rect="32,32,64,64" content="F2" offsetIconXY="-2" imageIcon="@Vol-.png" iconAlign="right" />
+				<buttonUI name="btn_f3" rect="32,32,64,64" content="F3" offsetIconXY="-2" imageIcon="@Vol+.png" iconAlign="right" />
+				<buttonUI name="btn_f4" rect="32,32,64,64" content="F4" offsetIconXY="-2" imageIcon="@Play.png" iconAlign="right" />
+			</layoutEleUI>
+			<layoutEleUI rect="-71,32,100,100" layout.height="fill" layout.width="auto" layout.space="4">
+				<buttonUI name="btn_f5" rect="96,52,64,64" content="F5" imageIcon="@Prev.png" offsetXY="4" offsetIconXY="-2" iconAlign="right" />
+				<buttonUI name="btn_f6" rect="32,32,64,64" content="F6" imageIcon="@Next.png" offsetXY="4" offsetIconXY="-2" iconAlign="right" />
+				<buttonUI name="btn_f7" rect="32,32,64,64" content="F7" />
+				<buttonUI name="btn_f8" rect="32,32,64,64" content="F8" />
+			</layoutEleUI>
+			<layoutEleUI rect="1292,32,100,100" layout.height="fill" layout.width="auto" layout.space="4">
+				<buttonUI name="btn_f9" rect="96,52,64,64" content="F9" />
+				<buttonUI name="btn_f10" rect="32,32,64,64" content="F10" />
+				<buttonUI name="btn_f11" rect="32,32,64,64" content="F11" />
+				<buttonUI name="btn_f12" rect="32,32,64,64" content="F12" />
+			</layoutEleUI>
+			<layoutEleUI rect="784,32,100,100" layout.height="fill" layout.width="auto" layout.space="4">
+				<buttonUI name="btn_del" rect="96,52,64,64" content="Del" />
+			</layoutEleUI>
+		</layoutEleUI>
+		<layoutEleUI rect="481,231,100,100" layout.width="fill" layout.height=":1" layout.horizon="false" layout.space="8">
+			<layoutEleUI rect="544,193,100,100" layout.width="fill" layout.height="64" layout.space="4" expandT="false">
+				<buttonUI name="btn_grave" rect="96,52,64,64" content="` ~" />
+				<buttonUI name="btn_1" rect="352,32,64,64" content="1 !" />
+				<buttonUI name="btn_2" rect="469,32,64,64" content="2 @" />
+				<buttonUI name="btn_3" rect="710,32,64,64" content="3 #" />
+				<buttonUI name="btn_4" rect="544,32,64,64" content="4 $" />
+				<buttonUI name="btn_5" rect="544,32,64,64" content="5 %" />
+				<buttonUI name="btn_6" rect="544,32,64,64" content="6 ^" />
+				<buttonUI name="btn_7" rect="544,32,64,64" content="7 &amp;" />
+				<buttonUI name="btn_8" rect="544,32,64,64" content="8 *" />
+				<buttonUI name="btn_9" rect="544,32,64,64" content="9 (" />
+				<buttonUI name="btn_0" rect="1031,32,64,64" content="0 )" />
+				<buttonUI name="btn_minus" rect="544,32,64,64" content="- _" />
+				<buttonUI name="btn_equal" rect="544,32,64,64" content="= +" />
+				<buttonUI name="btn_backspace" rect="544,32,112,64" content="Backspace" />
+			</layoutEleUI>
+			<layoutEleUI rect="942,153,100,100" layout.width="fill" layout.height="64" layout.space="4">
+				<buttonUI name="btn_tab" rect="96,52,88,64" content="Tab" />
+				<buttonUI name="btn_q" rect="352,32,64,64" content="Q" />
+				<buttonUI name="btn_w" rect="469,32,64,64" content="W" />
+				<buttonUI name="btn_e" rect="710,32,64,64" content="E" />
+				<buttonUI name="btn_r" rect="544,32,64,64" content="R" />
+				<buttonUI name="btn_t" rect="544,32,64,64" content="T" />
+				<buttonUI name="btn_y" rect="544,32,64,64" content="Y" />
+				<buttonUI name="btn_u" rect="544,32,64,64" content="U" />
+				<buttonUI name="btn_i" rect="544,32,64,64" content="I" />
+				<buttonUI name="btn_o" rect="544,32,64,64" content="O" />
+				<buttonUI name="btn_p" rect="1031,32,64,64" content="P" />
+				<buttonUI name="btn_bracket_l" rect="506,32,64,64" content="{ [" />
+				<buttonUI name="btn_bracket_r" rect="544,32,64,64" content="} ]" />
+				<buttonUI name="btn_backslash" rect="544,32,88,64" content="\ |" />
+			</layoutEleUI>
+			<layoutEleUI rect="537,153,100,100" layout.width="fill" layout.height="64" layout.space="4" expandT="false">
+				<buttonUI name="btn_caps" rect="96,52,112,64" content="Caps" buttonType="check" />
+				<buttonUI name="btn_a" rect="352,32,64,64" content="A" />
+				<buttonUI name="btn_s" rect="469,32,64,64" content="S" />
+				<buttonUI name="btn_d" rect="710,32,64,64" content="D" />
+				<buttonUI name="btn_f" rect="544,32,64,64" content="F" />
+				<buttonUI name="btn_g" rect="544,32,64,64" content="G" />
+				<buttonUI name="btn_h" rect="544,32,64,64" content="H" />
+				<buttonUI name="btn_j" rect="544,32,64,64" content="J" />
+				<buttonUI name="btn_k" rect="544,32,64,64" content="K" />
+				<buttonUI name="btn_l" rect="544,32,64,64" content="L" />
+				<buttonUI name="btn_semicolon" rect="1031,32,64,64" content=": ;" />
+				<buttonUI name="btn_quote" rect="544,32,64,64" content="' &quot;" />
+				<buttonUI name="btn_enter" rect="544,32,112,64" content="Enter" layout.width=":1" />
+			</layoutEleUI>
+			<layoutEleUI rect="667,153,100,100" layout.width="fill" layout.height="64" layout.space="4" expandT="false">
+				<buttonUI name="btn_shift_l" rect="96,52,136,64" content="Shift" buttonType="check" />
+				<buttonUI name="btn_z" rect="352,32,64,64" content="Z" />
+				<buttonUI name="btn_x" rect="469,32,64,64" content="X" />
+				<buttonUI name="btn_c" rect="710,32,64,64" content="C" />
+				<buttonUI name="btn_v" rect="544,32,64,64" content="V" />
+				<buttonUI name="btn_b" rect="544,32,64,64" content="B" />
+				<buttonUI name="btn_n" rect="544,32,64,64" content="N" />
+				<buttonUI name="btn_m" rect="544,32,64,64" content="M" />
+				<buttonUI name="btn_comma" rect="544,32,64,64" content="&lt; ," />
+				<buttonUI name="btn_period" rect="544,32,64,64" content="&gt; ." />
+				<buttonUI name="btn_slash" rect="1031,32,64,64" content="? /" />
+				<buttonUI name="btn_up" rect="544,32,64,64" imageIcon="@up.png" layout.margin="44" />
+			</layoutEleUI>
+			<layoutEleUI rect="83,168,100,100" layout.width="fill" layout.height="64">
+				<layoutEleUI rect="930,17,100,100" layout.width=":1" layout.height="fill" layout.space="4">
+					<buttonUI name="btn_ctrl" rect="96,52,64,64" content="Ctrl" buttonType="check" />
+					<buttonUI name="btn_fn" rect="544,32,64,64" content="Fn" buttonType="check" />
+					<buttonUI name="btn_win" rect="352,32,64,64" content="Win" buttonType="check" />
+					<buttonUI name="btn_alt" rect="469,32,64,64" content="Alt" buttonType="check" />
+					<buttonUI name="btn_space" rect="710,32,64,64" layout.width=":1" content="Space" layout.margin="24,0,24" />
+				</layoutEleUI>
+				<layoutEleUI rect="-95,32,100,100" layout.width="auto" layout.height="fill" layout.space="4">
+					<buttonUI name="btn_left" rect="544,32,64,64" imageIcon="@left.png" />
+					<buttonUI name="btn_down" rect="544,32,64,64" imageIcon="@down.png" />
+					<buttonUI name="btn_right" rect="544,32,64,64" imageIcon="@right.png" />
+				</layoutEleUI>
+			</layoutEleUI>
+		</layoutEleUI>
+	</layoutEleUI>
+</windowUI>

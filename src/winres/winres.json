@@ -33,22 +33,22 @@
     "#1": {
       "0000": {
         "fixed": {
-          "file_version": "0.2.1.0",
-          "product_version": "0.2.1.0"
+          "file_version": "0.2.2.0",
+          "product_version": "0.2.2.0"
         },
         "info": {
           "0804": {
             "Comments": "作者:Silas(silas@890625.com) | 基于 XCGUI 的屏幕键盘",
             "CompanyName": "芜湖浪花穿石科技有限公司",
             "FileDescription": "懒獭 - 屏幕键盘",
-            "FileVersion": "0.2.1.0",
+            "FileVersion": "0.2.2.0",
             "InternalName": "keyboard",
             "LegalCopyright": "Copyright (c) 2026 芜湖浪花穿石科技有限公司",
             "LegalTrademarks": "",
             "OriginalFilename": "keyboard.exe",
             "PrivateBuild": "",
             "ProductName": "懒獭 - 屏幕键盘",
-            "ProductVersion": "0.2.1.0",
+            "ProductVersion": "0.2.2.0",
             "SpecialBuild": ""
           }
         }

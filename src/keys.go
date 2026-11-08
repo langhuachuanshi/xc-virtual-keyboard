@@ -27,8 +27,6 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -52,7 +50,6 @@ var (
 const (
 	keyEventF_ExtendedKey = 0x0001
 	keyEventF_KeyUp       = 0x0002
-	keyEventF_Scancode    = 0x0008
 )
 
 // INPUT 联合体的 Go 对位:用最大成员 MOUSEINPUT 占位,保证 cbSize 与 C 布局
@@ -181,7 +178,6 @@ var extendedVK = map[uint32]bool{
 	uint32(xcc.VK_End):      true,
 	uint32(xcc.VK_PageUp):   true,
 	uint32(xcc.VK_PageDown): true,
-	uint32(xcc.VK_LWin):     true, // 物理扫描码 E0 5B,扫描码注入须带扩展前缀
 }
 
 // Fn 层媒体/浏览器键(MSDN 公开虚拟键值,绑定 xcc 未收录;Win7 起 SendInput
@@ -233,65 +229,20 @@ const winStartMenuDelay = time.Second
 // 代码侧操作按钮。
 var btnByName = map[string]*widget.Button{}
 
-// sendKey 用 SendInput 注入单个键事件,优先扫描码模式(KEYEVENTF_SCANCODE,
-// 扩展键加 0xE000 前缀):WebView2/Electron 类宿主会忽略纯虚拟码的合成事件、
-// 只认扫描码级合成(WebView2Feedback #5637 实证,Edge/Chrome 浏览器不复现)。
-// MapVirtualKeyW 取不到扫描码的键(部分媒体键)退回虚拟码模式。
+// sendKey 用 SendInput 注入单个键事件(带扫描码)。只发虚拟码时部分消费者
+// (Chromium/WebView2、shell 热键)不认,扫描码经 MapVirtualKeyW 补齐。
 func sendKey(vk uint32, extended, up bool) {
 	var in input
 	in.typ = inputKeyboard
-	ki := keyboardInput{wVk: uint16(vk)}
+	ki := keyboardInput{wVk: uint16(vk), wScan: uint16(scanOf(vk))}
+	if extended {
+		ki.dwFlags |= keyEventF_ExtendedKey
+	}
 	if up {
 		ki.dwFlags |= keyEventF_KeyUp
 	}
-	if scan := scanOf(vk); scan != 0 {
-		ki.dwFlags |= keyEventF_Scancode
-		if extended {
-			ki.dwFlags |= keyEventF_ExtendedKey
-			ki.wScan = uint16(scan | 0xE000)
-		} else {
-			ki.wScan = uint16(scan)
-		}
-	} else if extended {
-		ki.dwFlags |= keyEventF_ExtendedKey
-	}
 	*(*keyboardInput)(unsafe.Pointer(&in.u)) = ki
-	r1, _, err := procSendInput.Call(1, uintptr(unsafe.Pointer(&in)), unsafe.Sizeof(in))
-	dbgLog(vk, up, r1, err)
-}
-
-// dbgTag 由 -ldflags -X 注入,空 = 普通构建零开销;调试构建把每次注入的
-// 返回值/错误码/当时前台窗口记到 %TEMP%\kbdbg.log,用于注入链路排障。
-var (
-	dbgTag  = ""
-	dbgFile *os.File
-)
-
-// dbgLog 记录一次注入的现场(仅调试构建生效)。
-//
-// vk: 虚拟键码.
-//
-// up: 是否弹起.
-//
-// ret: SendInput 返回值(成功注入的事件数).
-//
-// err: syscall 错误码.
-func dbgLog(vk uint32, up bool, ret uintptr, err error) {
-	if dbgTag == "" {
-		return
-	}
-	if dbgFile == nil {
-		f, e := os.OpenFile(filepath.Join(os.TempDir(), "kbdbg.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-		if e != nil {
-			return
-		}
-		dbgFile = f
-	}
-	fg := wapi.GetForegroundWindow()
-	var title string
-	wapi.GetWindowTextW(fg, &title, 256)
-	fmt.Fprintf(dbgFile, "[%s] vk=0x%02X up=%v ret=%v err=%v fg=0x%X fgTitle=%q\n",
-		dbgTag, vk, up, ret, err, fg, title)
+	procSendInput.Call(1, uintptr(unsafe.Pointer(&in)), unsafe.Sizeof(in))
 }
 
 // scanOf 虚拟键 → 扫描码。

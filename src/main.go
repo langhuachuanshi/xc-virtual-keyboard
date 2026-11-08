@@ -54,15 +54,10 @@ func main() {
 	startCapsSync(a) // Caps 点亮态 300ms 对齐系统真实态,物理键盘切换不失步
 
 	// 5. 显示窗口 → 消息循环 → 释放 UI 库
-	// SW_SHOWNA:显示但不激活。SW_SHOW 会在启动瞬间把键盘变前台 —— 不抢点击
-	// 焦点的设计就被启动自己破坏了:此时直接点键,字符发进键盘自己进程,
-	// 看起来像"WebView2 没反应"(2026-11-08 实踩)。
-	w.ShowWindow(xcc.SW_SHOWNA)
+	w.Show(true)
 	// 置顶:NOACTIVATE 下点击永远不会把窗口提前(这正是按键能进目标窗口的代价),
-	// 屏幕键盘的惯例是常驻顶层,用户随时够得着。必须带 SWP_NOACTIVATE —— 不带的话
-	// 置顶这一下会激活窗口抢走前台,启动后点键全发进键盘自己进程(2026-11-08 实踩)。
-	wapi.SetWindowPos(hwnd, wapi.HWND_TOPMOST, 0, 0, 0, 0,
-		wapi.SWP_NOMOVE|wapi.SWP_NOSIZE|wapi.SWP_NOACTIVATE)
+	// 屏幕键盘的惯例是常驻顶层,用户随时够得着。
+	wapi.SetWindowPos(hwnd, wapi.HWND_TOPMOST, 0, 0, 0, 0, wapi.SWP_NOMOVE|wapi.SWP_NOSIZE)
 	a.Run()
 	closeKeySound()
 	a.Exit()

@@ -4,15 +4,17 @@ AI 助手与协作者的项目入口。
 
 ## 1. 项目概览
 
-懒獭 - 屏幕键盘:基于自维护 Go 绑定 `github.com/langhuachuanshi/xcgui/xcgui` 的 Windows 桌面虚拟键盘。设计器优先——外观本体在 `data/` 设计器资产里,Go 代码只管事件与数据。发布目标:Windows 7 x64 及以上。(项目尚未 git init)
+懒獭 - 屏幕键盘:基于自维护 Go 绑定 `github.com/langhuachuanshi/xcgui/xcgui` 的 Windows 桌面虚拟键盘。设计器优先——外观本体在 `data/` 设计器资产里,Go 代码只管事件与数据。发布目标:Windows 7 x64 及以上。仓库 [langhuachuanshi/xcgui-virtual-keyboard](https://github.com/langhuachuanshi/xcgui-virtual-keyboard)(公开,v0.1.0 已发 Release)。
 
 ## 2. 目录结构
 
 ```
-src/         Go 源码:main.go 程序入口(加载资产、建窗口、挂事件)
+src/         Go 源码:main.go 程序入口、keys.go 按键模拟(事件/粘滞/Fn 层/注入)、
+             sound.go 按键音、winres/ 图标与版本信息
 assets.go    根包://go:embed data/ 并提供内存 zip(embed 只能向下匹配,故放根上)
 data/        设计器资产(唯一副本):main.xml 布局(77 个按键全带 btn_ name)、
              resource.res(颜色变量/字体/图片注册)、default.css(全局样式)、images/、sounds/
+README.md    项目说明(公开仓库门面)
 TODO.md      任务索引
 Makefile     构建/运行/自检的唯一真源(make help 看命令)
 build/       构建产物(不入库)

@@ -80,15 +80,15 @@ type input struct {
 	u   mouseInput
 }
 
-// keyJobs 注入任务队列:缓冲 32 保证 UI 线程入队不阻塞(极端连打也只是背压),
-// worker 串行消费保证键序。appUI 供任务末尾把 UI 操作(CallUiThreadEx 熄灭
-// 粘滞按钮)回投到界面线程。
+// keyJobs 注入任务队列:缓冲 32,常规连打入队不阻塞,极端饱和时短暂等待
+// (背压);worker 串行消费保证键序。appUI 供任务末尾把 UI 操作(CallUiThreadEx
+// 熄灭粘滞按钮)回投到界面线程。
 var (
 	keyJobs = make(chan func(), 32)
 	appUI   *app.App
 )
 
-// startKeyWorker 启动注入工作协程。keybd_event 不碰 UI,可安全在后台执行。
+// startKeyWorker 启动注入工作协程。SendInput 不碰 UI,可安全在后台执行。
 func startKeyWorker(a *app.App) {
 	appUI = a
 	go func() {
@@ -138,7 +138,8 @@ func buildVkMap() map[string]uint32 {
 	return m
 }
 
-// stickyMods 粘滞修饰键:name → 虚拟键码;数组序即组合键的按下/释放顺序。
+// stickyMods 粘滞修饰键:name → 虚拟键码;数组序即 takeSticky 收走/弹起的
+// 遍历顺序(实际按下顺序由用户点亮先后决定)。
 var stickyMods = []struct {
 	name string
 	vk   uint32
@@ -179,7 +180,7 @@ var extendedVK = map[uint32]bool{
 	uint32(xcc.VK_PageDown): true,
 }
 
-// Fn 层媒体/浏览器键(MSDN 公开虚拟键值,绑定 xcc 未收录;Win7 起 keybd_event
+// Fn 层媒体/浏览器键(MSDN 公开虚拟键值,绑定 xcc 未收录;Win7 起 SendInput
 // 可发,系统直接出音量浮层/控制媒体)。
 const (
 	vkBrowserBack    uint32 = 0xA6 // 浏览器后退
@@ -224,8 +225,8 @@ var (
 // 系统弹开始菜单。时限内点 E 之类的键则照常组合。
 const winStartMenuDelay = time.Second
 
-// btnByName 全部按键按钮引用,由 bindKeys 填充:粘滞熄灭、Fn 标签切换、
-// Caps 同步都要从代码侧操作按钮。
+// btnByName 全部按键按钮引用,由 bindKeys 填充:粘滞熄灭、Caps 同步都要从
+// 代码侧操作按钮。
 var btnByName = map[string]*widget.Button{}
 
 // sendKey 用 SendInput 注入单个键事件(带扫描码)。只发虚拟码时部分消费者
@@ -280,7 +281,7 @@ func takeSticky() []string {
 
 // unlightButtons 熄灭按钮勾选态(UI 线程执行)。stickyOn 已在 takeSticky 清零,
 // Button_Check 若触发,各分支的物理弹起/单击条件(stickyOn 仍为真)不成立,
-// 不会误弹开始菜单/误切输入法。
+// 不会误弹开始菜单。
 func unlightButtons(names []string) {
 	for _, n := range names {
 		if b := btnByName[n]; b != nil {
@@ -422,6 +423,17 @@ func releaseKeyUp(names []string) {
 	}
 }
 
+// releaseHeldMods 退出前把仍处于物理按下状态的修饰键弹起,防止进程结束后
+// 系统层面卡键(如点亮 Win 后 1 秒内直接点关闭)。
+func releaseHeldMods() {
+	for _, m := range stickyMods {
+		if stickyOn[m.name] {
+			stickyOn[m.name] = false
+			keyUp(m.vk, false)
+		}
+	}
+}
+
 // unlightOnUI 把粘滞按钮熄灭回投到 UI 线程执行(worker 协程不直接碰 UI)。
 //
 // names: takeSticky 收走的待熄灭按钮名.
@@ -484,6 +496,7 @@ func bindKeys(w *window.Window) {
 				})
 			case name == "btn_close":
 				b.AddEvent_BnClick(func(hEle int, pbHandled *bool) int {
+					releaseHeldMods() // 退出前弹起仍按住的修饰键,防系统卡键
 					w.CloseWindow()
 					return 0
 				})

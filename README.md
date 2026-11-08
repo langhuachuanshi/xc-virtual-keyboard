@@ -26,8 +26,8 @@
 ## 构建
 
 ```bash
-make build   # x64 发布版 -> build/keyboard.exe(Win7 兼容,go1.20.14 工具链,UPX 加壳)
-make x86     # x86 发布版 -> build/keyboard-x86.exe(UPX 加壳)
+make build   # x64 发布版 -> build/keyboard.exe(Win7 兼容,go1.20.14 工具链)
+make x86     # x86 发布版 -> build/keyboard-x86.exe
 make run     # 日常调试(本机新 Go,仅 Win10/11 本机跑)
 make check   # go vet(与发布同口径)
 make clean   # 清 build/

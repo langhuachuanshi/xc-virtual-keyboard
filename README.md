@@ -17,7 +17,7 @@
 
 ## 下载
 
-[Releases](https://github.com/langhuachuanshi/xcgui-virtual-keyboard/releases) · 当前 [v0.2.3](https://github.com/langhuachuanshi/xcgui-virtual-keyboard/releases/tag/v0.2.3)
+[Releases](https://github.com/langhuachuanshi/xcgui-virtual-keyboard/releases) · 当前 [v0.2.4](https://github.com/langhuachuanshi/xcgui-virtual-keyboard/releases/tag/v0.2.4)
 
 | 文件 | 适用 |
 |---|---|

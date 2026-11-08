@@ -1,6 +1,6 @@
 # 懒獭 - 屏幕键盘 —— 日常命令(真源就是这个文件)
 
-.PHONY: help build x86 x86-pack run check clean
+.PHONY: help build x86 run check clean
 
 ifeq ($(OS),Windows_NT)
 SHELL := C:/Program Files/Git/usr/bin/sh.exe
@@ -36,10 +36,6 @@ x86:
 	@mkdir -p $(BUILD_DIR)
 	GOTOOLCHAIN=$(GO_WIN7) GOARCH=386 go build -trimpath -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/keyboard-x86.exe ./src
 	@go version $(BUILD_DIR)/keyboard-x86.exe 2>/dev/null | head -1 | sed 's/^/==> built with: /'
-	@ls -l $(BUILD_DIR)/keyboard-x86.exe
-
-# 32 位加壳:单独命令,先 make x86 再跑;对已加壳文件重复跑 UPX 会报 AlreadyPackedException,重编即可。
-x86-pack:
 	$(UPX) --best $(BUILD_DIR)/keyboard-x86.exe
 	@ls -l $(BUILD_DIR)/keyboard-x86.exe
 
@@ -58,12 +54,11 @@ clean:
 # HELP-BEGIN
 # 懒獭 - 屏幕键盘 —— 常用命令
 #
-#   make build     发布构建 -> build/keyboard.exe(Go 1.20.14 + UPX 加壳,Win7 x64 ~ Win11)
-#   make x86       32 位版 -> build/keyboard-x86.exe(32 位 Win7 老机器,不加壳)
-#   make x86-pack  给 32 位版 UPX 加壳(先跑 make x86)
-#   make run       日常调试(go run,本机新 Go,仅本机 Win10/11)
-#   make check     go vet(与发布同口径,锁 1.20.14)
-#   make clean     清 build/
+#   make build   发布构建 -> build/keyboard.exe(x64,UPX 加壳,Win7 x64 ~ Win11)
+#   make x86     32 位版 -> build/keyboard-x86.exe(UPX 加壳,32 位 Win7)
+#   make run     日常调试(go run,本机新 Go,仅本机 Win10/11)
+#   make check   go vet(与发布同口径,锁 1.20.14)
+#   make clean   清 build/
 #
 # HELP-END
 #

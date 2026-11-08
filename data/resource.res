@@ -19,7 +19,7 @@
 	<type_id />
 	<type_font>
 		<font name="MicrosoftYaHei_14" size="14" fontName="微软雅黑" style="bold" />
-		<font name="MicrosoftYaHei_16" size="16" fontName="宋体" style="bold" />
+		<font name="MicrosoftYaHei_16" size="16" fontName="微软雅黑" style="bold" />
 	</type_font>
 	<type_string />
 	<type_color>

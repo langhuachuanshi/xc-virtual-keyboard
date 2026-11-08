@@ -58,7 +58,9 @@ const (
 // INPUT 联合体的 Go 对位:用最大成员 MOUSEINPUT 占位,保证 cbSize 与 C 布局
 // 一致(x64=40, x86=28),KEYBDINPUT 经指针重解释写进同一块内存;字段顺序与
 // 自然对齐照 MSDN,不可乱。
-const inputKeyboard = 0 // INPUT type: 键盘事件
+// INPUT type 常量:0=鼠标 1=键盘(2026-11-08 实踩:写成 0 时每个"抬键"都变成
+// 鼠标左键按下注入,全局输入报废)。
+const inputKeyboard = 1
 
 type keyboardInput struct {
 	wVk       uint16

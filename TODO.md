@@ -4,7 +4,6 @@
 
 - [ ] main.xml 移除窗口阴影属性(transparentFlag="shadow" shadowSize shadowAngleSize,设计器里改)——Win7 上 DLL 解析布局仍可能内部走带 BUG 的阴影路径,阴影统一由代码按系统接管
 - [ ] resource.res 清理 stale dir 绝对路径(dir 指向已删除的旧 xcgui\images)
-- [ ] git init + .gitignore(build/ 与产物 exe 不入库)
 - [ ] Caps 同步真机验收:GetKeyState 是每线程快照,本窗口不获焦可能读到旧值;若真机失步,升级为 AttachThreadInput 挂前台线程再读
 - [ ] 长按连发(Backspace/方向键):XC 定时器按住时重复发键,手感对齐物理键盘(可选)
 
@@ -14,6 +13,8 @@
 
 ## 已完成
 
+- [x] git init + 首次提交 + tag v0.1.0 + 双架构发布产物(build/keyboard.exe x64、keyboard-x86.exe,均 go1.20.14)(2026-11-08 完成)
+- [x] 代码自审六项全修:注入 worker 化+连打竞态、GetKeyState 收 UI 线程、fnLayer 单表、sendKey 合并、注释清理、waveOut 关闭顺序(2026-11-08 完成)
 - [x] Fn 层(2026-11-08 完成):Fn 粘滞 + F1-F8 = 音量/媒体/浏览器键(VK 本地定义,xcc 未收录)、Fn+方向键 = Home/End/PgUp/PgDn;Fn 点亮时 F 区/方向键动态换标签提示,熄灭还原(设计器无需加图标)
 - [x] Caps 点亮态实时同步:300ms 轮询 GetKeyState 对齐按钮(2026-11-08 完成)
 - [x] 任务栏图标:WS_EX_NOACTIVATE 默认藏任务栏按钮,补 WS_EX_APPWINDOW(2026-11-08 完成)

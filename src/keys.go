@@ -377,27 +377,42 @@ func onModCheck(name string, checked bool) {
 	}
 }
 
-// onKeyClick 普通键按下 → 组装注入任务入队(按下声已在 LButtonDown 响过)。
-// 粘滞修饰键在点亮时就已物理按下,这里只发字符本身,再依次弹起全部粘滞键。
-func onKeyClick(name string) {
-	// Fn 组合优先:媒体/导航键不吃 Shift 等修饰,直接发完释放全部粘滞
+// 长按连发:普通键按住 repeatDelay 后以 repeatInterval 连发,松开鼠标停止;
+// 连发期间粘滞修饰键保持按下,松开时统一弹起(物理键盘同款)。连发不发播音
+// (33ms 一次会嗡嗡响);单鼠标同一时刻最多一个会话。
+const (
+	repeatDelay    = 500 * time.Millisecond
+	repeatInterval = 33 * time.Millisecond
+)
+
+// keyRepeat 当前连发会话;stop 为 nil = 无会话。release 是会话开始时收走的
+// 粘滞键,结束时统一弹起熄灭。仅 UI 线程读写。
+var keyRepeat struct {
+	name    string
+	stop    chan struct{}
+	release []string
+}
+
+// resolveVK 键名 → 当前语义下的虚拟键码:Fn 粘滞时优先 fnLayer(媒体/导航),
+// 否则查常规键码表。
+func resolveVK(name string) (uint32, bool) {
 	if stickyOn["btn_fn"] {
 		for _, k := range fnLayer {
 			if k.name == name {
-				vk := k.vk
-				release := takeSticky()
-				keyJobs <- func() {
-					keyDown(vk, extendedVK[vk])
-					time.Sleep(15 * time.Millisecond)
-					keyUp(vk, extendedVK[vk])
-					releaseKeyUp(release)
-					unlightOnUI(release)
-				}
-				return
+				return k.vk, true
 			}
 		}
 	}
 	vk, ok := vkByName[name]
+	return vk, ok
+}
+
+// startKeyRepeat 普通键按下:立即发第一击并启动连发会话(UI 线程调用)。
+// 会话开始时收走粘滞态(修饰键保持物理按下,超时等机制不再干扰),结束时
+// 由 stopKeyRepeat 统一弹起熄灭。
+func startKeyRepeat(name string) {
+	stopKeyRepeat() // 单鼠标:开新会话前必须结束旧的(弹起事件万一丢失的兜底)
+	vk, ok := resolveVK(name)
 	if !ok {
 		return
 	}
@@ -406,9 +421,49 @@ func onKeyClick(name string) {
 		keyDown(vk, extendedVK[vk])
 		time.Sleep(15 * time.Millisecond)
 		keyUp(vk, extendedVK[vk])
+	}
+	keyRepeat.name = name
+	keyRepeat.stop = make(chan struct{})
+	keyRepeat.release = release
+	stop := keyRepeat.stop
+	go func() {
+		select {
+		case <-time.After(repeatDelay):
+		case <-stop:
+			return
+		}
+		t := time.NewTicker(repeatInterval)
+		defer t.Stop()
+		for {
+			select {
+			case <-t.C:
+				keyJobs <- func() {
+					keyDown(vk, extendedVK[vk])
+					time.Sleep(15 * time.Millisecond)
+					keyUp(vk, extendedVK[vk])
+				}
+			case <-stop:
+				return
+			}
+		}
+	}()
+}
+
+// stopKeyRepeat 结束当前连发会话(若有):停止连发,并把会话开始时收走的
+// 粘滞修饰键弹起、按钮熄灭(UI 线程调用;无会话时是空操作)。
+func stopKeyRepeat() {
+	if keyRepeat.stop == nil {
+		return
+	}
+	close(keyRepeat.stop)
+	release := keyRepeat.release
+	keyJobs <- func() {
 		releaseKeyUp(release)
 		unlightOnUI(release)
 	}
+	keyRepeat.stop = nil
+	keyRepeat.release = nil
+	keyRepeat.name = ""
 }
 
 // releaseKeyUp 弹起一批粘滞修饰键(字符/Fn 组合发完后调用)。
@@ -470,7 +525,7 @@ func startCapsSync(a *app.App) {
 //   - btn_min/btn_close:窗口控制钮,挂 BnClick 执行最小化/关闭,不播音不发键;
 //   - check 型修饰键:按下播音,Button_Check 驱动粘滞/Caps 逻辑(两个事件是两个
 //     不同的信号:声音跟"按下",逻辑跟"勾选态变化",时序由 DLL 定,合一不可靠);
-//   - 其余键位:单个 LButtonDown 里播音+发键,按下即出。
+//   - 其余键位:按下播音+首击并启动长按连发,弹起停止并释放粘滞修饰键。
 func bindKeys(w *window.Window) {
 	hwnd := w.GetHWND()
 	var walk func(hObj int)
@@ -509,10 +564,14 @@ func bindKeys(w *window.Window) {
 					onModCheck(name, bCheck)
 					return 0
 				})
-			default: // 普通键位:一个事件干两件事,按下即播音+发键
+			default: // 普通键位:按下=播音+首击+启动连发;弹起=停止连发并释放粘滞
 				b.AddEvent_LButtonDown(func(hEle int, nFlags int, pPt *xc.POINT, pbHandled *bool) int {
 					playKeySound()
-					onKeyClick(name)
+					startKeyRepeat(name)
+					return 0
+				})
+				b.AddEvent_LButtonUp(func(hEle int, nFlags int, pPt *xc.POINT, pbHandled *bool) int {
+					stopKeyRepeat()
 					return 0
 				})
 			}

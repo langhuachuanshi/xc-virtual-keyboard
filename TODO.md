@@ -2,11 +2,9 @@
 
 ## 待办
 
-- [ ] WebView2 焦点输入实测:已切 SendInput,若宿主仍收不到,优先排查宿主是否管理员权限运行(UIPI 静默丢弃注入);仍失败则加 GetGUIThreadInfo 取焦点窗口 + PostMessage WM_KEYDOWN/UP 直发回退
+- [ ] Win7 真机验收(用户确认遗留):跑一遍打字/修饰键/音效/置顶/任务栏图标
 - [ ] main.xml 移除窗口阴影属性(transparentFlag="shadow" shadowSize shadowAngleSize,设计器里改)——Win7 上 DLL 解析布局仍可能内部走带 BUG 的阴影路径,阴影统一由代码按系统接管
 - [ ] resource.res 清理 stale dir 绝对路径(dir 指向已删除的旧 xcgui\images)
-- [ ] Caps 同步真机验收:GetKeyState 是每线程快照,本窗口不获焦可能读到旧值;若真机失步,升级为 AttachThreadInput 挂前台线程再读
-- [ ] 长按连发(Backspace/方向键):XC 定时器按住时重复发键,手感对齐物理键盘(可选)
 
 ## 进行中
 
@@ -14,6 +12,8 @@
 
 ## 已完成
 
+- [x] 长按连发(2026-11-08 完成):按住 500ms 后 33ms/次连发,松开停止;连发期间粘滞修饰键保持按下,松开统一弹起;WebView2 焦点输入经用户实测确认可用(SendInput 生效)
+- [x] Caps 真机确认同步正常(2026-11-08 用户确认),AttachThreadInput 后备方案销案
 - [x] v0.2.0 验收通过并发布(2026-11-08 完成):切中英/Win 开始菜单/复制粘贴/WebView2 输入/Fn 五项全过;winres 版本升 0.2.0.0,补齐公司/版权/作者信息
 - [x] Shift 单击切中英(2026-11-08 定稿,参考 QtSoftKeyboard;TabTip 两击式是公认痛点):独立单击=完整物理单击立即切中英,Ctrl/Alt/Win 点亮时退化为组合修饰键;修复程序化熄灭丢 Redraw 导致的"视觉还亮着"(违反 AGENTS.md 铁律实踩)
 - [x] Win 单击弹开始菜单(2026-11-08 定稿):点亮即物理按下,1 秒内无组合键消费自动弹起(无键间隔,系统弹开始菜单);时限内点 E 则 Win+E 照常;Fn 动态标签按用户要求撤销(提示图标归设计器资产)

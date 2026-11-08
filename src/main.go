@@ -6,6 +6,7 @@
 package main
 
 import (
+	"os"
 	"syscall"
 	"unsafe"
 
@@ -18,7 +19,26 @@ import (
 	"github.com/langhuachuanshi/xcgui/xcgui/xcc"
 )
 
+var procCreateMutexW = syscall.NewLazyDLL("kernel32.dll").NewProc("CreateMutexW")
+
+// errAlreadyExists Windows ERROR_ALREADY_EXISTS:命名对象已存在(已有实例在跑)。
+const errAlreadyExists = 183
+
+// ensureSingleInstance 单实例锁:命名互斥体(当前登录会话作用域)已存在说明键盘
+// 已在运行,静默退出(用户要求:再次双击不弹任何提示)。进程退出(含崩溃)由内核
+// 自动释放互斥体,无残留;句柄故意不关,保活到进程结束。
+func ensureSingleInstance() {
+	name, _ := syscall.UTF16PtrFromString(`Local\LazyOtterKeyboard_SingleInstance`)
+	_, _, err := procCreateMutexW.Call(0, 0, uintptr(unsafe.Pointer(name)))
+	if err.(syscall.Errno) == errAlreadyExists {
+		os.Exit(0)
+	}
+}
+
 func main() {
+	// 0. 单实例:已有实例则静默退出(放在一切初始化之前,第二实例不落 DLL 不发声)
+	ensureSingleInstance()
+
 	// 1. 初始化 UI 库(失败打印原因并退出)
 	app.InitOrExit()
 

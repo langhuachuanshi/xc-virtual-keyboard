@@ -16,12 +16,14 @@
 
 ## 下载
 
-[Releases](https://github.com/langhuachuanshi/xcgui-virtual-keyboard/releases) · 当前 [v0.2.1](https://github.com/langhuachuanshi/xcgui-virtual-keyboard/releases/tag/v0.2.1)
+[Releases](https://github.com/langhuachuanshi/xcgui-virtual-keyboard/releases) · 当前 [v0.2.2](https://github.com/langhuachuanshi/xcgui-virtual-keyboard/releases/tag/v0.2.2)
 
 | 文件 | 适用 |
 |---|---|
 | `keyboard.exe` | x64(Windows 7 x64 及以上) |
 | `keyboard-x86.exe` | x86(32 位 Windows 7) |
+
+> **需要管理员权限运行**:exe 已内嵌盾牌(manifest `requireAdministrator`),双击会弹 UAC 确认。向 WebView2 / Electron 等 Chromium 类宿主注入输入必须提权,普通权限下注入会被系统静默丢弃。
 
 ## 构建
 

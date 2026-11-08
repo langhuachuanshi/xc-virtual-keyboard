@@ -11,9 +11,10 @@
 //   - 普通键单个 LButtonDown 干完播音+发键(按下即出,真键盘手感);
 //   - min/close 的 buttonType 只管视觉,动作由代码挂 BnClick。
 //
-// Shift 对齐物理键盘:点亮=按住(组合键用);空点熄灭(本轮没消费过)直控
-// 输入法转换模式切中/英(WM_IME_CONTROL,确定性,不赌模拟按键的时序)。
-// Win 空点同理弹开始菜单。按用户要求不做键帽上档显示。
+// 粘滞 = 物理按住:点亮修饰键立即注入"按下"、熄灭注入"弹起"(2026-11-08 定稿,
+// 旧模型"点亮不发键、打字才组合"发不出 Ctrl+Shift 这类纯修饰组合,QQ拼音的
+// Shift 切英文等全部无效)。如此 Shift/Win 的空点单击(按下+弹起)就是一次完整
+// 的物理单击:输入法自己切中/英、系统自己弹开始菜单,无需任何特殊分支。
 //
 // 状态同步(虚拟键盘通行做法,防合成事件卡修饰键/大小写反转):Caps 不盲发,
 // 先在 UI 线程读 GetKeyState 系统真实态,与按钮期望态不一致才补发。注意
@@ -41,18 +42,11 @@ var (
 	procSendInput     = syscall.NewLazyDLL("user32.dll").NewProc("SendInput")
 	procGetKeyState   = syscall.NewLazyDLL("user32.dll").NewProc("GetKeyState")
 	procMapVirtualKey = syscall.NewLazyDLL("user32.dll").NewProc("MapVirtualKeyW")
-	// imm32:中/英切换走 WM_IME_CONTROL 直控转换模式,不模拟 Shift 按键。
-	procImmGetDefaultIMEWnd = syscall.NewLazyDLL("imm32.dll").NewProc("ImmGetDefaultIMEWnd")
 )
 
 const (
 	keyEventF_ExtendedKey = 0x0001
 	keyEventF_KeyUp       = 0x0002
-
-	wmImeControl         = 0x0283
-	imcGetConversionMode = 0x0001
-	imcSetConversionMode = 0x0002
-	imeCmodeNative       = 0x0001 // 转换模式的中/英位:1=中文 0=英文
 )
 
 // INPUT 联合体的 Go 对位:用最大成员 MOUSEINPUT 占位,保证 cbSize 与 C 布局
@@ -152,6 +146,16 @@ var stickyMods = []struct {
 	{"btn_win", uint32(xcc.VK_LWin)},
 }
 
+// stickyVKOf 粘滞键名 → 虚拟键码(非粘滞键返回 0)。
+func stickyVKOf(name string) uint32 {
+	for _, m := range stickyMods {
+		if m.name == name {
+			return m.vk
+		}
+	}
+	return 0
+}
+
 // checkBtns 布局里的 check 型按钮(含非粘滞的 caps/fn),决定事件走 Button_Check。
 var checkBtns = map[string]bool{
 	"btn_caps": true, "btn_shift_l": true, "btn_ctrl": true,
@@ -212,13 +216,8 @@ var fnLayer = []struct {
 var labelOrig = map[string]string{}
 
 // 粘滞态以 Go 变量为真源(由 Button_Check 回调同步,DLL 的勾选视觉自动跟随
-// 用户点击)。winConsumed/shiftConsumed 标记本轮 Win/Shift 粘滞是否已被组合
-// 键消费,决定空点熄灭时要不要补发单击(Win=开始菜单,Shift=输入法中英切换)。
-var (
-	stickyOn      = map[string]bool{}
-	winConsumed   bool
-	shiftConsumed bool
-)
+// 用户点击);点亮即物理按下,熄灭即物理弹起。
+var stickyOn = map[string]bool{}
 
 // btnByName 全部按键按钮引用,由 bindKeys 填充:粘滞熄灭、Fn 标签切换、
 // Caps 同步都要从代码侧操作按钮。
@@ -244,18 +243,6 @@ func sendKey(vk uint32, extended, up bool) {
 func scanOf(vk uint32) uintptr {
 	s, _, _ := procMapVirtualKey.Call(uintptr(vk), 0)
 	return s
-}
-
-// toggleImeMode 翻转前台窗口输入法的中/英转换模式(等价物理 Shift 单击的
-// 效果,但不赌模拟按键被 IME 认不认)。无 IME 的纯英文系统上自然无感。
-func toggleImeMode() {
-	fg := wapi.GetForegroundWindow()
-	ime, _, _ := procImmGetDefaultIMEWnd.Call(fg)
-	if ime == 0 {
-		return
-	}
-	mode := wapi.SendMessageW(ime, wmImeControl, imcGetConversionMode, 0)
-	wapi.SendMessageW(ime, wmImeControl, imcSetConversionMode, uintptr(mode)^imeCmodeNative)
 }
 
 // keyDown/keyUp sendKey 的语义包装,保留调用点可读性。
@@ -315,30 +302,16 @@ func onModCheck(name string, checked bool) {
 			}
 		}
 	default:
-		// 粘滞修饰键:记录挂起,不立即发键
-		if name == "btn_win" {
-			// Win 单击模拟:挂起后没按过任何键就再点熄灭 = 物理键盘单击 Win
-			// (按下即弹开始菜单),粘滞模型只能在熄灭时机补发这一下。
-			if !checked && stickyOn[name] && !winConsumed {
-				keyJobs <- func() {
-					keyDown(uint32(xcc.VK_LWin), false)
-					time.Sleep(15 * time.Millisecond)
-					keyUp(uint32(xcc.VK_LWin), false)
-				}
+		// 粘滞 = 物理按住:点亮立即注入按下,熄灭注入弹起。空点(两次点击间没
+		// 按过任何键)对系统就是一个完整的物理单击 —— Shift 单击由输入法自己
+		// 切中/英,Win 单击弹开始菜单,Ctrl+Shift 这类纯修饰组合也真实成立。
+		if stickyOn[name] && !checked {
+			if v := stickyVKOf(name); v != 0 {
+				keyJobs <- func() { keyUp(v, false) }
 			}
-			if checked {
-				winConsumed = false // 新一轮挂起,重新计"有没有按过键"
-			}
-		}
-		if name == "btn_shift_l" {
-			if checked {
-				shiftConsumed = false // 新一轮挂起
-			} else {
-				// Shift 单击 = 输入法中/英切换:空点熄灭(本轮没消费过)直控前台
-				// 输入法转换模式,物理键盘单击 Shift 的等价效果;纯英文系统无 IME,无感。
-				if stickyOn[name] && !shiftConsumed {
-					toggleImeMode()
-				}
+		} else if checked {
+			if v := stickyVKOf(name); v != 0 {
+				keyJobs <- func() { keyDown(v, false) }
 			}
 		}
 		// Fn 点亮/熄灭时切换映射键的临时标签,当场提示这个键会发什么
@@ -354,6 +327,7 @@ func onModCheck(name string, checked bool) {
 }
 
 // onKeyClick 普通键按下 → 组装注入任务入队(按下声已在 LButtonDown 响过)。
+// 粘滞修饰键在点亮时就已物理按下,这里只发字符本身,再依次弹起全部粘滞键。
 func onKeyClick(name string) {
 	// Fn 组合优先:媒体/导航键不吃 Shift 等修饰,直接发完释放全部粘滞
 	if stickyOn["btn_fn"] {
@@ -365,6 +339,7 @@ func onKeyClick(name string) {
 					keyDown(vk, extendedVK[vk])
 					time.Sleep(15 * time.Millisecond)
 					keyUp(vk, extendedVK[vk])
+					releaseKeyUp(release)
 					unlightOnUI(release)
 				}
 				return
@@ -375,34 +350,25 @@ func onKeyClick(name string) {
 	if !ok {
 		return
 	}
-	// 入队前在 UI 线程定格组合成员:挂着的修饰键按下 → 字符 → 反序释放,
-	// 然后全部自动弹起。注入间隔延时:shell 热键(Win+E 等)对时序敏感。
-	var stuck []uint32
-	for _, m := range stickyMods {
-		if stickyOn[m.name] {
-			stuck = append(stuck, m.vk)
-			switch m.name { // 被组合消费的键,空点熄灭时不再补发单击
-			case "btn_win":
-				winConsumed = true
-			case "btn_shift_l":
-				shiftConsumed = true
-			}
-		}
-	}
 	release := takeSticky()
 	keyJobs <- func() {
-		for _, v := range stuck {
-			keyDown(v, false)
-			time.Sleep(20 * time.Millisecond)
-		}
 		keyDown(vk, extendedVK[vk])
 		time.Sleep(15 * time.Millisecond)
 		keyUp(vk, extendedVK[vk])
-		for i := len(stuck) - 1; i >= 0; i-- {
-			keyUp(stuck[i], false)
+		releaseKeyUp(release)
+		unlightOnUI(release)
+	}
+}
+
+// releaseKeyUp 弹起一批粘滞修饰键(字符/Fn 组合发完后调用)。
+//
+// names: takeSticky 收走的待熄灭按钮名.
+func releaseKeyUp(names []string) {
+	for _, n := range names {
+		if v := stickyVKOf(n); v != 0 {
+			keyUp(v, false)
 			time.Sleep(10 * time.Millisecond)
 		}
-		unlightOnUI(release)
 	}
 }
 

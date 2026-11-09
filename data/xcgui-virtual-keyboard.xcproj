@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<project name="" ui_loadType="1" ui_zipPassword="" expand="1">
+<project name="屏幕键盘" ui_loadType="1" ui_zipPassword="" expand="0">
 	<vc config="调试版" platform="x86" moduleLib="" autoDefFile="1" loadDllSymbol="0" moduleBeta="0">
 		<setting>
 			<config name="调试版">

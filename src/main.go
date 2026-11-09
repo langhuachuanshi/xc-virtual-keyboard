@@ -74,6 +74,7 @@ func main() {
 	startCapsSync(a) // Caps 点亮态 300ms 对齐系统真实态,物理键盘切换不失步
 
 	// 5. 显示窗口 → 消息循环 → 释放 UI 库
+	w.AdjustLayout()
 	w.Show(true)
 	// 置顶:NOACTIVATE 下点击永远不会把窗口提前(这正是按键能进目标窗口的代价),
 	// 屏幕键盘的惯例是常驻顶层,用户随时够得着。

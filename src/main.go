@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	assets "github.com/langhuachuanshi/xcgui-virtual-keyboard"
+	assets "github.com/langhuachuanshi/xc-virtual-keyboard"
 
 	"github.com/twgh/xcgui/app"
 	"github.com/twgh/xcgui/wapi"

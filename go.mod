@@ -1,4 +1,4 @@
-module github.com/langhuachuanshi/xcgui-virtual-keyboard
+module github.com/langhuachuanshi/xc-virtual-keyboard
 
 go 1.18
 

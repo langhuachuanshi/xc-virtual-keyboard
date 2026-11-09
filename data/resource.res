@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--炫彩界面库-资源文件-->
 <resources>
-	<type_image dir="D:\Project\xcgui-virtual-keyboard\data\images">
+	<type_image dir="D:\Project\xc-virtual-keyboard\data\images">
 		<image name="close.png" value="images\close.png" loadType="file" style="default" />
 		<image name="down.png" value="images\down.png" loadType="file" style="default" />
 		<image name="left.png" value="images\left.png" loadType="file" style="default" />

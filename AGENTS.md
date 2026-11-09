@@ -4,7 +4,7 @@ AI 助手与协作者的项目入口。
 
 ## 1. 项目概览
 
-懒獭 - 屏幕键盘:基于上游 Go 绑定 `github.com/twgh/xcgui` 的 Windows 桌面虚拟键盘。设计器优先——外观本体在 `data/` 设计器资产里,Go 代码只管事件与数据。发布目标:Windows 7 x64 及以上。仓库 [langhuachuanshi/xcgui-virtual-keyboard](https://github.com/langhuachuanshi/xcgui-virtual-keyboard)(公开,v0.1.0 已发 Release)。
+懒獭 - 屏幕键盘:基于上游 Go 绑定 `github.com/twgh/xcgui` 的 Windows 桌面虚拟键盘。设计器优先——外观本体在 `data/` 设计器资产里,Go 代码只管事件与数据。发布目标:Windows 7 x64 及以上。仓库 [langhuachuanshi/xc-virtual-keyboard](https://github.com/langhuachuanshi/xc-virtual-keyboard)(公开,v0.1.0 已发 Release)。
 
 ## 2. 目录结构
 

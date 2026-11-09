@@ -1,6 +1,6 @@
 # 懒獭 - 屏幕键盘
 
-基于自维护 [XCGUI(炫彩界面库)Go 绑定](https://github.com/langhuachuanshi/xcgui) 的 Windows 屏幕虚拟键盘。单文件、免依赖、不抢焦点,支持 Windows 7 SP1 ~ Windows 11。
+基于上游 [XCGUI(炫彩界面库)Go 绑定 twgh/xcgui](https://github.com/twgh/xcgui) 的 Windows 屏幕虚拟键盘。单文件、免依赖、不抢焦点,支持 Windows 7 SP1 ~ Windows 11。
 
 <!-- 预览截图待补:![preview](docs/screenshot.png) -->
 
@@ -41,7 +41,7 @@ make clean   # 清 build/
 - **Win7 兼容**:发布产物固定用 Go 1.20.14 编译(Makefile `GOTOOLCHAIN` 自动处理)——Go 1.21+ 的产物在 Win7 上无法启动。
 - **资产内嵌**:`data/` 是设计器(炫彩 IDE)资产的唯一副本,改完必须重新编译,运行时不读盘。
 - **图标/版本信息**:改 `src/winres/` 后先 `xc res make` 再构建。
-- **依赖绑定**:开发机 `go.mod` 里 `replace` 指向本地绑定源码;其他机器构建删除该行,直接走 GitHub 依赖。
+- **依赖绑定**:`go.mod` 直接依赖上游 [twgh/xcgui](https://github.com/twgh/xcgui) v1.4.3,无 `replace`,任何机器构建一致。
 
 ## 目录
 
@@ -54,7 +54,7 @@ Makefile    构建命令唯一真源
 
 ## 技术要点
 
-- Go(无 CGO),自维护 XCGUI 绑定,xcgui.dll 内嵌、运行时释放
+- Go(无 CGO),上游 twgh/xcgui 绑定,xcgui.dll 内嵌、运行时释放
 - 设计器优先:布局与外观在 `data/`,Go 只管事件与数据;`btn_` 前缀命名即两侧契约
 - 按键注入 `keybd_event`(带扫描码,单 worker 协程串行保序);按键音 winmm waveOut 常驻缓冲重触发
 - 不抢焦点:WS_EX_NOACTIVATE(+ APPWINDOW 保任务栏图标),窗口常驻顶层

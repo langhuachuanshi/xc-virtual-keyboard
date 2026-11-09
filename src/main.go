@@ -12,11 +12,11 @@ import (
 
 	assets "github.com/langhuachuanshi/xcgui-virtual-keyboard"
 
-	"github.com/langhuachuanshi/xcgui/xcgui/app"
-	"github.com/langhuachuanshi/xcgui/xcgui/wapi"
-	"github.com/langhuachuanshi/xcgui/xcgui/window"
-	"github.com/langhuachuanshi/xcgui/xcgui/xc"
-	"github.com/langhuachuanshi/xcgui/xcgui/xcc"
+	"github.com/twgh/xcgui/app"
+	"github.com/twgh/xcgui/wapi"
+	"github.com/twgh/xcgui/window"
+	"github.com/twgh/xcgui/xc"
+	"github.com/twgh/xcgui/xcc"
 )
 
 var procCreateMutexW = syscall.NewLazyDLL("kernel32.dll").NewProc("CreateMutexW")
